@@ -790,12 +790,37 @@ public:
 
         uchar c = bwt[psi_s];
 
-        /*
-        ここでs,e更新処理(sample.range)
-        */
+
+        // updating range, rangeR
+        ulint run_psi_s = bwt.run_of_position(psi_s);
+        ulint run_start = bwt.run_start(run_psi_s);
+        ulint run_psi_e = bwt.run_of_position(psi_e);
+        ulint run_end = bwt.run_end(run_psi_e);
+
+        assert(run_start <= psi_s);
+        sample.range.first = psi_s;
+        if (run_start == psi_s) {
+            ulint pos = samples_first[run_psi_s];
+
+            while (sample.range.first > 0 && plcp[pos] >= sample.len-1)
+            {
+                sample.range.first--;
+                pos = Phi(pos);
+            }
+        }
+        assert(psi_e <= run_end);
+        sample.range.second = psi_e;
+        if (run_end == psi_e) {
+            ulint pos = samples_last[run_psi_e];
+
+            while (sample.range.second < bwt.size()-1)
+            {
+                pos = PhiI(pos);
+                if (plcp[pos] < sample.len-1) break;
+                sample.range.second++;
+            }
+        }
         
-
-
         // accumulated occ of aP (for any a s.t. a < c)
         ulint acc = 0;
         for (ulint a = 1; a < c; ++a)
@@ -831,9 +856,35 @@ public:
 
         uchar c = bwtR[psiR_sR];
 
-        /*
-        ここでsR,eR更新処理(sample.rangeR)
-        */
+        // updating range, rangeR
+        ulint run_psiR_sR = bwtR.run_of_position(psiR_sR);
+        ulint run_start = bwtR.run_start(run_psiR_sR);
+        ulint run_psiR_eR = bwtR.run_of_position(psiR_eR);
+        ulint run_end = bwtR.run_end(run_psiR_eR);
+
+        assert(run_start <= psiR_sR);
+        sample.rangeR.first = psiR_sR;
+        if (run_start == psiR_sR) {
+            ulint pos = samples_firstR[run_psiR_sR];
+
+            while (sample.rangeR.first > 0 && plcpR[pos] >= sample.len-1)
+            {
+                sample.rangeR.first--;
+                pos = PhiR(pos);
+            }
+        }
+        assert(psiR_eR <= run_end);
+        sample.rangeR.second = psiR_eR;
+        if (run_end == psiR_eR) {
+            ulint pos = samples_lastR[run_psiR_eR];
+
+            while (sample.rangeR.second < bwtR.size()-1)
+            {
+                pos = PhiIR(pos);
+                if (plcpR[pos] < sample.len-1) break;
+                sample.rangeR.second++;
+            }
+        }
 
         // accumulated occ of Pa (for any a s.t. a < c)
         ulint acc = 0;
@@ -1060,6 +1111,36 @@ public:
         }
 
         return res;
+    }
+
+    // gets MEMs 
+    // returns (matched length, [(offset in P, matched sample),])
+    std::pair<
+        ulint,
+        std::vector<std::pair<ulint,br_sample>>
+    > 
+    maximal_exact_match(std::string const& pattern)
+    {
+        std::vector<std::pair<ulint,br_sample>> res;
+        ulint m = pattern.size();
+        ulint i = 0, j = 0, l = 0, max_l = 0;
+
+        br_sample sample(get_initial_sample());
+        while (true)
+        {
+            while (j < m)
+            {
+                br_sample new_sample = right_extension((uchar)pattern[j]);
+                if (new_sample.is_invalid()) break;
+                sample = new_sample;
+                l++;
+                j++;
+            }
+            if (l == max_l)
+
+
+        }
+
     }
 
     std::unordered_map<range_t,br_sample,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
