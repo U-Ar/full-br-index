@@ -800,7 +800,7 @@ public:
         assert(run_start <= psi_s);
         sample.range.first = psi_s;
         if (run_start == psi_s) {
-            ulint pos = samples_first[run_psi_s];
+            ulint pos = (samples_first[run_psi_s]+1) % bwt.size();
 
             while (sample.range.first > 0 && plcp[pos] >= sample.len-1)
             {
@@ -811,7 +811,7 @@ public:
         assert(psi_e <= run_end);
         sample.range.second = psi_e;
         if (run_end == psi_e) {
-            ulint pos = samples_last[run_psi_e];
+            ulint pos = (samples_last[run_psi_e]+1) % bwt.size();
 
             while (sample.range.second < bwt.size()-1)
             {
@@ -865,7 +865,7 @@ public:
         assert(run_start <= psiR_sR);
         sample.rangeR.first = psiR_sR;
         if (run_start == psiR_sR) {
-            ulint pos = samples_firstR[run_psiR_sR];
+            ulint pos = (samples_firstR[run_psiR_sR]+1) % bwtR.size();
 
             while (sample.rangeR.first > 0 && plcpR[pos] >= sample.len-1)
             {
@@ -876,7 +876,7 @@ public:
         assert(psiR_eR <= run_end);
         sample.rangeR.second = psiR_eR;
         if (run_end == psiR_eR) {
-            ulint pos = samples_lastR[run_psiR_eR];
+            ulint pos = (samples_lastR[run_psiR_eR]+1) % bwtR.size();
 
             while (sample.rangeR.second < bwtR.size()-1)
             {
@@ -900,7 +900,7 @@ public:
         // updating j, d, len (very simple for contraction)
         if (sample.d == sample.len - 1) 
         {
-            j--; d--;
+            sample.j--; sample.d--;
         }
         sample.len--;
 
@@ -1130,7 +1130,7 @@ public:
         {
             while (j < m)
             {
-                br_sample new_sample = right_extension((uchar)pattern[j]);
+                br_sample new_sample = right_extension((uchar)pattern[j],sample);
                 if (new_sample.is_invalid()) break;
                 sample = new_sample;
                 l++;
@@ -1150,6 +1150,7 @@ public:
             if (i == j)
             {
                 sample = get_initial_sample();
+                j++;
                 l = 0;
             }
             else 

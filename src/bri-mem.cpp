@@ -9,8 +9,7 @@ using namespace bri;
 using namespace std;
 
 string check = string();
-size_t left_len = 0;
-size_t core_len = 0;
+bool once = false;
 
 void help()
 {
@@ -18,8 +17,9 @@ void help()
 
 	cout << "Usage: bri-mem [options] <index> <patterns>" << endl;
 	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
+    cout << "   -once        use a text file as one pattern instead of pattern file" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
-	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
+	cout << "   <patterns>   file in pizza&chili format or simple text file(if -once) containing the patterns." << endl;
 
 	exit(0);
 }
@@ -42,6 +42,10 @@ void parse_args(char** argv, int argc, int &ptr){
 		check = string(argv[ptr]);
 		ptr++;
     
+    }
+    else if (s.compare("-once") == 0)
+    {
+        once = true;
     }
     else
     {
@@ -83,47 +87,139 @@ void locate_all(ifstream& in, string patterns)
 
     auto t2 = high_resolution_clock::now();
 
-    cout << "searching patterns with mismatches at most " << allowed << " ... " << endl;
-    ifstream ifs(patterns);
-
-    //read header of the pizza&chilli input file
-	//header example:
-	//# number=7 length=10 file=genome.fasta forbidden=\n\t
-    string header;
-    getline(ifs,header);
-
-    ulint n = get_number_of_patterns(header);
-    ulint m = get_patterns_length(header);
-
-    ulint last_perc = 0;
-
-    ulint occ_tot = 0;
-
-    auto t3 = high_resolution_clock::now();
-    auto t4 = high_resolution_clock::now();
-    auto t5 = high_resolution_clock::now();
-    ulint count_time = 0;
-    ulint locate_time = 0;
-    ulint tot_time = 0;
-
-    // extract patterns from file and search them in the index
-    for (ulint i = 0; i < n; ++i)
+    cout << "searching maximal exact matches ..." << endl;
+    
+    if (!once)
     {
-        ulint perc = 100 * i / n;
-        if (perc > last_perc)
-        {
-            cout << perc << "% done ..." << endl;
-            last_perc = perc;
-        }
+        ifstream ifs(patterns);
 
-        string p = string();
+        //read header of the pizza&chilli input file
+        //header example:
+        //# number=7 length=10 file=genome.fasta forbidden=\n\t
+        string header;
+        getline(ifs,header);
 
-        for (ulint j = 0; j < m; ++j)
+        ulint n = get_number_of_patterns(header);
+        ulint m = get_patterns_length(header);
+
+        ulint last_perc = 0;
+
+        ulint occ_tot = 0;
+
+        auto t3 = high_resolution_clock::now();
+        auto t4 = high_resolution_clock::now();
+        auto t5 = high_resolution_clock::now();
+        ulint count_time = 0;
+        ulint locate_time = 0;
+        ulint tot_time = 0;
+
+        // extract patterns from file and search them in the index
+        for (ulint i = 0; i < n; ++i)
         {
-            char c;
-            ifs.get(c);
-            p += c;
+            ulint perc = 100 * i / n;
+            if (perc > last_perc)
+            {
+                cout << perc << "% done ..." << endl;
+                last_perc = perc;
+            }
+
+            string p = string();
+
+            for (ulint j = 0; j < m; ++j)
+            {
+                char c;
+                ifs.get(c);
+                p += c;
+            }
+
+            t3 = high_resolution_clock::now();
+
+            std::pair<
+                ulint,
+                std::vector<std::pair<ulint,br_sample>>
+            > res = idx.maximal_exact_match(p);
+
+            t4 = high_resolution_clock::now();
+
+            std::vector<ulint> occs;
+            for (auto p: res.second) {
+                auto tmp = idx.locate_sample(p.second);
+                occs.insert(occs.end(),tmp.begin(),tmp.end());
+            }
+
+            t5 = high_resolution_clock::now();
+
+            count_time += duration_cast<microseconds>(t4-t3).count();
+            locate_time += duration_cast<microseconds>(t5-t4).count();
+            occ_tot += occs.size();
+            tot_time += duration_cast<microseconds>(t4-t3).count() + duration_cast<microseconds>(t5-t4).count();
+
+
+            if (c) // check occurrences
+            {
+                cout << "length of MEM : " << res.first << endl;
+                cout << "number of MEM occs : " << occs.size() << endl;
+                ulint maxlen = res.first;
+                for (auto pair: res.second)
+                {
+                    ulint offset = pair.first;
+                    auto occs = idx.locate_sample(pair.second);
+                    for (auto o: occs)
+                    {
+                        for (ulint i = 0; i < maxlen; ++i)
+                        {
+                            if (text[o+i] != p[i+offset])
+                            {
+                                cout << "wrong occurrence  occ: " << o << " offset on P: " << offset << endl;
+                            }
+                        }
+                    }
+                }
+            }
+
         }
+        double occ_avg = (double)occ_tot / n;
+        
+        cout << endl << occ_avg << " average occurrences per pattern" << endl;
+
+        ifs.close();
+
+        ulint load = duration_cast<milliseconds>(t2-t1).count();
+        cout << "Load time  : " << load << " milliseconds" << endl;
+
+        cout << "Number of patterns n = " << n << endl;
+        cout << "Pattern length     m = " << m << endl;
+        cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
+
+        cout << "LF-mapping time: " << count_time << " microseconds" << endl;
+        cout << "Phi        time: " << locate_time << " microseconds" << endl;
+        cout << "Total time : " << tot_time << " microseconds" << endl;
+        cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
+        cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
+    }
+    else if (once)
+    {
+
+        ifstream ifs(patterns);
+
+        stringstream ssp;
+        ssp << ifs.rdbuf();
+        string p = ssp.str();
+
+
+        ulint n = 1;
+        ulint m = p.size();
+
+        ulint occ_tot = 0;
+
+        auto t3 = high_resolution_clock::now();
+        auto t4 = high_resolution_clock::now();
+        auto t5 = high_resolution_clock::now();
+        ulint count_time = 0;
+        ulint locate_time = 0;
+        ulint tot_time = 0;
+
+
 
         t3 = high_resolution_clock::now();
 
@@ -152,10 +248,6 @@ void locate_all(ifstream& in, string patterns)
         {
             cout << "length of MEM : " << res.first << endl;
             cout << "number of MEM occs : " << occs.size() << endl;
-            for (auto s : samples)
-            {
-                cout << "s: " << s.second.range.first << " e: " << s.second.range.second << " j: " << s.second.j << " len: " << s.second.len << endl;
-            }
             ulint maxlen = res.first;
             for (auto pair: res.second)
             {
@@ -175,26 +267,24 @@ void locate_all(ifstream& in, string patterns)
         }
 
         
+
+
+        ulint load = duration_cast<milliseconds>(t2-t1).count();
+        cout << "Load time  : " << load << " milliseconds" << endl;
+
+        cout << "Pattern length     m =  " << m << endl;
+        cout << "Matched maximal length: " << res.first << endl;
+        cout << "Offsets of MEMs: \n    ";
+        for (auto pair: res.second) {
+            cout << pair.first << " ";
+        } cout << endl;
+        cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
+
+        cout << "LF-mapping time: " << count_time << " microseconds" << endl;
+        cout << "Phi        time: " << locate_time << " microseconds" << endl;
+        cout << "Total time : " << tot_time << " microseconds" << endl;
+        cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
     }
-
-    double occ_avg = (double)occ_tot / n;
-    
-    cout << endl << occ_avg << " average occurrences per pattern" << endl;
-
-    ifs.close();
-
-    ulint load = duration_cast<milliseconds>(t2-t1).count();
-    cout << "Load time  : " << load << " milliseconds" << endl;
-
-    cout << "Number of patterns n = " << n << endl;
-	cout << "Pattern length     m = " << m << endl;
-	cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
-
-    cout << "LF-mapping time: " << count_time << " microseconds" << endl;
-    cout << "Phi        time: " << locate_time << " microseconds" << endl;
-    cout << "Total time : " << tot_time << " microseconds" << endl;
-	cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
-	cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
 }
 
 
