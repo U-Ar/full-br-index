@@ -9,22 +9,17 @@ using namespace bri;
 using namespace std;
 
 string check = string();
-long allowed = 0;
 size_t left_len = 0;
 size_t core_len = 0;
 
 void help()
 {
-	cout << "bri-seedex: locate all occurrences of the input patterns" << endl;
-    cout << "             with exact core and some mismatched characters."        << endl << endl;
+	cout << "bri-mem: locate maximal exact matches of the input patterns." << endl;
 
-	cout << "Usage: bri-seedex [options] <index> <patterns>" << endl;
-    cout << "   -m <number>  max number of mismatched characters allowed (0 by default)" << endl;
+	cout << "Usage: bri-mem [options] <index> <patterns>" << endl;
 	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
-    cout << "   <left>       length of the left region" << endl;
-    cout << "   <core>       length of the core exact region" << endl;
 
 	exit(0);
 }
@@ -48,25 +43,6 @@ void parse_args(char** argv, int argc, int &ptr){
 		ptr++;
     
     }
-    else if (s.compare("-m") == 0)
-    {
-
-        if(ptr>=argc-1){
-            cout << "Error: missing parameter after -m option." << endl;
-            help();
-        }
-
-        char* e;
-        allowed = strtol(argv[ptr],&e,10);
-
-        if(*e != '\0' || allowed < 0){
-            cout << "Error: invalid negative value after -m option." << endl;
-            help();
-        }
-
-        ptr++;
-
-	}
     else
     {
 
@@ -149,11 +125,8 @@ void locate_all(ifstream& in, string patterns)
             p += c;
         }
 
-        size_t m1 = left_len;
-        size_t m2 = left_len + core_len;
-
         t3 = high_resolution_clock::now();
-        auto samples = idx.seed_and_extend(p,m1,m2,allowed);
+        auto samples = idx.maximal_exact_match(p);
         t4 = high_resolution_clock::now();
         auto occs = idx.locate_samples(samples);
         t5 = high_resolution_clock::now();
@@ -166,15 +139,14 @@ void locate_all(ifstream& in, string patterns)
 
         if (c) // check occurrences
         {
-            cout << "number of occs with at most " << allowed << " mismatch   : " << occs.size() << endl;
-            //cout << "the original pattern: " << p << endl;
+            cout << "number of MEM occs : " << occs.size() << endl;
             for (auto s : samples)
             {
-                cout << s.second.range.first << " " << s.second.range.second << " " << s.second.j << " " << s.second.len << endl;
+                cout << "s: " << s.second.range.first << " e: " << s.second.range.second << " j: " << s.second.j << " len: " << s.second.len << endl;
             }
             for (auto o : occs)
             {
-                int mismatches = 0;
+                /*int mismatches = 0;
                 for (size_t i = 0; i < m; ++i)
                 {
                     if (text[o+i] != p[i]) mismatches++;
@@ -193,7 +165,7 @@ void locate_all(ifstream& in, string patterns)
                         cout << "       original pattern:  " << p << endl;
                         cout << "       wrong    pattern:  " << text.substr(o,p.size()) << endl;
                     }
-                }
+                }*/
             }
         }
 
@@ -228,26 +200,12 @@ int main(int argc, char** argv)
 
     int ptr = 1;
 
-    while (ptr < argc - 4) parse_args(argv, argc, ptr);
+    while (ptr < argc-2) parse_args(argv, argc, ptr);
 
     string idx_file(argv[ptr]);
     string patt_file(argv[ptr+1]);
 
     char* e;
-        
-    left_len = strtol(argv[ptr+2],&e,10);
-
-    if(*e != '\0'){
-        cout << "Error: invalid value for <left>" << endl;
-        help();
-    }
-
-    core_len = strtol(argv[ptr+3],&e,10);
-
-    if(*e != '\0'){
-        cout << "Error: invalid value for <core>" << endl;
-        help();
-    }
 
     ifstream in(idx_file);
 

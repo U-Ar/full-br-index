@@ -2,14 +2,12 @@
 #include <chrono>
 
 #include "br_index.hpp"
-#include "br_index_nplcp.hpp"
 #include "utils.hpp"
 
 using namespace bri;
 using namespace std;
 
 long allowed = 0;
-bool nplcp = false;
 
 void help()
 {
@@ -17,7 +15,6 @@ void help()
     cout << "            allowing some mismatched characters."                 << endl << endl;
 
 	cout << "Usage: bri-count [options] <index> <patterns>" << endl;
-    cout << "   -nplcp       use the version without PLCP."<<endl;
     cout << "   -m <number>  number of mismatched characters allowed (0 by default)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
@@ -49,13 +46,7 @@ void parse_args(char** argv, int argc, int &ptr){
 
         ptr++;
 
-	} 
-    else if (s.compare("-nplcp") == 0)
-    {
-
-        nplcp = true;
-
-    }
+	}
     else 
     {
 
@@ -163,10 +154,7 @@ int main(int argc, char** argv)
 
     cout << "Loading br-index" << endl;
 
-    if (nplcp)
-        count_all<br_index_nplcp<> >(in, patt_file);
-    else 
-        count_all<br_index<> >(in, patt_file);
+    count_all<br_index<> >(in, patt_file);
 
     in.close();
 

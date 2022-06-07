@@ -185,16 +185,18 @@ public:
         // cache SAR
         sdsl::construct_sa<8>(ccR);
         // cache ISAR
-        //sdsl::construct_isa(ccR);
+        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
 
-        // plcp is not needed in the reversed case
+        // plcpR is needed for full index
+        plcpR = permuted_lcp<>(ccR);
 
         // remove cache of textR and SAR
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, ccR));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
 
 
 
@@ -290,6 +292,11 @@ public:
         // sort samples of last positions in runs according to text position
         std::sort(samples_last_vec.begin(), samples_last_vec.end());
 
+        // sort samples of first positions in runs according to text position
+        std::sort(samples_first_vecR.begin(), samples_first_vecR.end());
+        // sort samples of last positions in runs according to text position
+        std::sort(samples_last_vecR.begin(), samples_last_vecR.end());
+
         // build Elias-Fano predecessor
         {
             std::vector<bool> first_bv(bwt_s.size(),false);
@@ -327,6 +334,46 @@ public:
         for (ulint i = 0; i < samples_last_vec.size(); ++i)
         {
             last_to_run[i] = samples_last_vec[i].second;
+        }
+
+
+        // build Elias-Fano predecessor for reversed direction
+        {
+            std::vector<bool> first_bvR(bwt_sR.size(),false);
+            for (auto p: samples_first_vecR)
+            {
+                assert(p.first < first_bvR.size());
+                first_bvR[p.first] = true;
+            }
+            firstR = sparse_bitvector_t(first_bvR);
+        }
+        {
+            std::vector<bool> last_bvR(bwt_sR.size(),false);
+            for (auto p: samples_last_vecR)
+            {
+                assert(p.first < last_bvR.size());
+                last_bvR[p.first] = true;
+            }
+            lastR = sparse_bitvector_t(last_bvR);
+        }
+
+        assert(firstR.rank(firstR.size()) == rR);
+        assert(lastR.rank(lastR.size()) == rR);
+
+        first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+
+        last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+
+        // construct first_to_run
+        for (ulint i = 0; i < samples_first_vecR.size(); ++i)
+        {
+            first_to_runR[i] = samples_first_vecR[i].second;
+        }
+
+        // construct last_to_run
+        for (ulint i = 0; i < samples_last_vecR.size(); ++i)
+        {
+            last_to_runR[i] = samples_last_vecR[i].second;
         }
 
         // release ISA cache
@@ -1629,24 +1676,35 @@ private:
     ulint terminator_positionR = 0;
     ulint rR = 0;
 
-    // needed for left_extension
+    // left_extension
     sdsl::int_vector<> samples_first;
     sdsl::int_vector<> samples_last;
     
-    // needed for Phi (SA[i] -> SA[i-1])
+    // Phi (SA[i] -> SA[i-1])
     sparse_bitvector_t first;
     sdsl::int_vector<> first_to_run;
     
-    // needed for Phi^{-1} (SA[i] -> SA[i+1])
+    // PhiI (SA[i] -> SA[i+1])
     sparse_bitvector_t last;
     sdsl::int_vector<> last_to_run;
 
-    // needed for right_extension
+    // right_extension
     sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
 
-    // needed for determining the end of locate
+    // PhiR
+    sparse_bitvector_t firstR;
+    sdsl::int_vector<> first_to_runR;
+
+    // PhiIR
+    sparse_bitvector_t lastR;
+    sdsl::int_vector<> last_to_runR;
+
+    // determining the end of locate & left_contraction
     permuted_lcp<> plcp;
+
+    // right_contraction
+    permuted_lcp<> plcpR;
 
 };
 

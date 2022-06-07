@@ -3,7 +3,6 @@
 #include <string>
 
 #include "br_index.hpp"
-#include "br_index_nplcp.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -12,17 +11,14 @@ using namespace bri;
 string out_basename = string();
 string input_file = string();
 bool sais = true;
-bool nplcp = false;
 
 void help(){
-	cout << "bri-build: builds the bidirectional r-index. Extension .bri/.brin is automatically added to output index file" << endl << endl;
+	cout << "bri-build: builds the full bidirectional r-index. Extension .bri is automatically added to output index file" << endl << endl;
 	cout << "Usage: bri-build [options] <input_file_name>" << endl;
 	cout << "   -o <basename>        use 'basename' as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
 	cout << "   -divsufsort          use divsufsort algorithm to build the BWT (fast, 7.5n Bytes of RAM). By default,"<<endl;
 	cout << "                        SE-SAIS is used (about 4 time slower than divsufsort, 4n Bytes of RAM)."<<endl;
-    cout << "   -nplcp               use the version without PLCP. When locating, calculate LF^d(p) first."<<endl;
-    cout << "                        fast when occ is very high, but takes slightly larger space than the normal version."<<endl;
-	cout << "   <input_file_name>    input text file." << endl;
+    cout << "   <input_file_name>    input text file." << endl;
 	exit(0);
 }
 
@@ -51,12 +47,6 @@ void parse_args(char** argv, int argc, int &ptr){
 		sais = false;
 
 	}
-    else if (s.compare("-nplcp") == 0)
-    {
-
-        nplcp = true;
-
-    }
     else
     {
 		cout << "Error: unrecognized '" << s << "' option." << endl;
@@ -89,8 +79,7 @@ int main(int argc, char** argv)
     
     string idx_file = out_basename;
 
-    if (nplcp) idx_file.append(".brin");
-    else idx_file.append(".bri");
+    idx_file.append(".bri");
 
     cout << "Building br-index of input file " << input_file << endl;
     cout << "Index will be saved to " << idx_file << endl;
@@ -107,16 +96,8 @@ int main(int argc, char** argv)
 
     std::ofstream out(idx_file);
 
-    if (nplcp)
-    {
-        br_index_nplcp<> idx(input,sais);
-        idx.serialize(out);
-    } 
-    else 
-    {
-        br_index<> idx(input,sais);
-        idx.serialize(out);
-    }
+    br_index<> idx(input,sais);
+    idx.serialize(out);
 
     auto t2 = high_resolution_clock::now();
 
