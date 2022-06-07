@@ -489,6 +489,59 @@ public:
         return (prev_sample + delta) % bwt.size();
     }
 
+    /*
+     * PhiR function
+     * get SAR[i] from SAR[i+1]
+     */
+    ulint PhiR(ulint i)
+    {
+        assert(i != bwtR.size() - 1);
+
+        ulint jr = firstR.predecessor_rank_circular(i);
+
+        assert(jr <= rR - 1);
+
+        ulint k = firstR.select(jr);
+
+        assert(jr < rR - 1 || k == bwtR.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(first_to_runR[jr] > 0);
+
+        ulint prev_sample = samples_lastR[first_to_runR[jr]-1];
+
+        return (prev_sample + delta) % bwtR.size();
+    }
+    /*
+     * PhiR inverse
+     * get SAR[i] from SAR[i-1]
+     */
+    ulint PhiIR(ulint i)
+    {
+        //assert(i != last_SA_val);
+
+        ulint jr = lastR.predecessor_rank_circular(i);
+
+        assert(jr <= rR - 1);
+
+        ulint k = lastR.select(jr);
+
+        assert(jr < rR - 1 || k == bwtR.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(last_to_runR[jr] < rR-1);
+
+        ulint prev_sample = samples_firstR[last_to_runR[jr]+1];
+
+        return (prev_sample + delta) % bwtR.size();
+    }
+
     ulint LF(ulint i)
     {
         auto c = bwt[i];
@@ -719,6 +772,87 @@ public:
             sample.dR++; 
         }*/
         sample.len++;
+        return sample;
+    }
+
+    /*
+     * match the pattern P from the current pattern cP
+     * return SAR&SA range corresponding to P
+     */
+    br_sample left_contraction(br_sample const& prev_sample)
+    {
+        br_sample sample(prev_sample);
+        assert(sample.len > 0);
+
+        // get Psi(s), Psi(e)
+        ulint psi_s = FL(sample.range.first);
+        ulint psi_e = FL(sample.range.second);
+
+        uchar c = bwt[psi_s];
+
+        /*
+        ここでs,e更新処理(sample.range)
+        */
+        
+
+
+        // accumulated occ of aP (for any a s.t. a < c)
+        ulint acc = 0;
+        for (ulint a = 1; a < c; ++a)
+        {
+            range_t smaller_range = LF(sample.range,(uchar)a);
+            acc += (smaller_range.second+1) - smaller_range.first;
+        }
+        // get range for SAR
+        sample.rangeR.first -= acc;
+        sample.rangeR.second = sample.rangeR.first + sample.range.second - sample.range.first;
+
+
+        // updating j, d, len (very simple for contraction)
+        if (sample.d == 0) sample.j++;
+        else sample.d--;
+
+        sample.len--;
+
+        return sample;
+    }
+    /*
+     * match the pattern P from the current pattern Pc
+     * return SAR&SA range corresponding to P
+     */
+    br_sample right_contraction(br_sample const& prev_sample)
+    {
+        br_sample sample(prev_sample);
+        assert(sample.len > 0);
+
+        // get PsiR(sR), Psi(eR)
+        ulint psiR_sR = FLR(sample.rangeR.first);
+        ulint psiR_eR = FLR(sample.rangeR.second);
+
+        uchar c = bwtR[psiR_sR];
+
+        /*
+        ここでsR,eR更新処理(sample.rangeR)
+        */
+
+        // accumulated occ of Pa (for any a s.t. a < c)
+        ulint acc = 0;
+        for (ulint a = 1; a < c; ++a)
+        {
+            range_t smaller_rangeR = LFR(sample.rangeR,(uchar)a);
+            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
+        }
+        // get range for SA
+        sample.range.first -= acc;
+        sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
+
+        // updating j, d, len (very simple for contraction)
+        if (sample.d == sample.len - 1) 
+        {
+            j--; d--;
+        }
+        sample.len--;
+
         return sample;
     }
 
