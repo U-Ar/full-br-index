@@ -126,9 +126,20 @@ void locate_all(ifstream& in, string patterns)
         }
 
         t3 = high_resolution_clock::now();
-        auto samples = idx.maximal_exact_match(p);
+
+        std::pair<
+            ulint,
+            std::vector<std::pair<ulint,br_sample>>
+        > res = idx.maximal_exact_match(p);
+
         t4 = high_resolution_clock::now();
-        auto occs = idx.locate_samples(samples);
+
+        std::vector<ulint> occs;
+        for (auto p: res.second) {
+            auto tmp = idx.locate_sample(p.second);
+            occs.insert(occs.end(),tmp.begin(),tmp.end());
+        }
+
         t5 = high_resolution_clock::now();
 
         count_time += duration_cast<microseconds>(t4-t3).count();
@@ -139,33 +150,27 @@ void locate_all(ifstream& in, string patterns)
 
         if (c) // check occurrences
         {
+            cout << "length of MEM : " << res.first << endl;
             cout << "number of MEM occs : " << occs.size() << endl;
             for (auto s : samples)
             {
                 cout << "s: " << s.second.range.first << " e: " << s.second.range.second << " j: " << s.second.j << " len: " << s.second.len << endl;
             }
-            for (auto o : occs)
+            ulint maxlen = res.first;
+            for (auto pair: res.second)
             {
-                /*int mismatches = 0;
-                for (size_t i = 0; i < m; ++i)
+                ulint offset = pair.first;
+                auto occs = idx.locate_sample(pair.second);
+                for (auto o: occs)
                 {
-                    if (text[o+i] != p[i]) mismatches++;
-                }
-                if (mismatches > allowed) 
-                {
-                    cout << "Error: wrong occurrence:  " << o << endl;
-                    cout << "       original pattern:  " << p << endl;
-                    cout << "       wrong    pattern:  " << text.substr(o,p.size()) << endl;
-                }
-                for (ulint k = m1; k < m2; ++k)
-                {
-                    if (text[o+k] != p[k]) 
+                    for (ulint i = 0; i < maxlen; ++i)
                     {
-                        cout << "Error: wrong occurrence:  " << o << endl;
-                        cout << "       original pattern:  " << p << endl;
-                        cout << "       wrong    pattern:  " << text.substr(o,p.size()) << endl;
+                        if (text[o+i] != p[i+offset])
+                        {
+                            cout << "wrong occurrence  occ: " << o << " offset on P: " << offset << endl;
+                        }
                     }
-                }*/
+                }
             }
         }
 

@@ -39,6 +39,11 @@ TARGET_LINK_LIBRARIES(bri-seedex sdsl)
 TARGET_LINK_LIBRARIES(bri-seedex divsufsort)
 TARGET_LINK_LIBRARIES(bri-seedex divsufsort64)
 
+ADD_EXECUTABLE(bri-mem src/bri-mem.cpp)
+TARGET_LINK_LIBRARIES(bri-mem sdsl)
+TARGET_LINK_LIBRARIES(bri-mem divsufsort)
+TARGET_LINK_LIBRARIES(bri-mem divsufsort64)
+
 ADD_EXECUTABLE(bri-space src/bri-space.cpp)
 TARGET_LINK_LIBRARIES(bri-space sdsl)
 TARGET_LINK_LIBRARIES(bri-space divsufsort)

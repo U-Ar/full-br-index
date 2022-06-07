@@ -1123,10 +1123,10 @@ public:
     {
         std::vector<std::pair<ulint,br_sample>> res;
         ulint m = pattern.size();
-        ulint i = 0, j = 0, l = 0, max_l = 0;
+        ulint j = 0, l = 0, max_l = 0;
 
         br_sample sample(get_initial_sample());
-        while (true)
+        for (ulint i = 0; i < m; ++i)
         {
             while (j < m)
             {
@@ -1137,10 +1137,32 @@ public:
                 j++;
             }
             if (l == max_l)
-
-
+            {
+                res.push_back(std::pair<ulint,br_sample>(i,sample));
+            }
+            else if (l > max_l)
+            {
+                max_l = l;
+                res.clear();
+                res.push_back(std::pair<ulint,br_sample>(i,sample));
+            }
+            
+            if (i == j)
+            {
+                sample = get_initial_sample();
+                l = 0;
+            }
+            else 
+            {
+                sample = left_contraction(sample);
+                l--;
+            }
         }
 
+        return std::pair<
+                ulint,
+                std::vector<std::pair<ulint,br_sample>>
+                > (max_l, res);
     }
 
     std::unordered_map<range_t,br_sample,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
@@ -1475,7 +1497,14 @@ public:
         w_bytes += samples_firstR.serialize(out);
         w_bytes += samples_lastR.serialize(out);
 
+        w_bytes += firstR.serialize(out);
+        w_bytes += first_to_runR.serialize(out);
+
+        w_bytes += lastR.serialize(out);
+        w_bytes += last_to_runR.serialize(out);
+
         w_bytes += plcp.serialize(out);
+        w_bytes += plcpR.serialize(out);
 
         return w_bytes;
     
@@ -1515,7 +1544,14 @@ public:
         samples_firstR.load(in);
         samples_lastR.load(in);
 
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+
         plcp.load(in);
+        plcpR.load(in);
 
     }
 
@@ -1577,6 +1613,7 @@ public:
         std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
 
         tot_bytes += plcp.print_space();
+        tot_bytes += plcpR.print_space();
 
         std::ofstream out("/dev/null");
 
@@ -1618,6 +1655,25 @@ public:
         tot_bytes += bytes;
         std::cout << "samples_lastR: " << bytes << " bytes" << std::endl;
 
+
+        bytes =  firstR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "firstR: " << bytes << " bytes" << std::endl;
+
+        bytes =  first_to_runR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "first_to_runR: " << bytes << " bytes" << std::endl;
+
+
+        bytes =  lastR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "lastR: " << bytes << " bytes" << std::endl;
+
+        bytes =  last_to_runR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "last_to_runR: " << bytes << " bytes" << std::endl;
+
+
         std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
         std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl;
 
@@ -1643,6 +1699,7 @@ public:
         tot_bytes += bwtR.get_space();
 
         tot_bytes += plcp.get_space();
+        tot_bytes += plcpR.get_space();
 
         std::ofstream out("/dev/null");
 
@@ -1657,6 +1714,12 @@ public:
 
         tot_bytes += samples_firstR.serialize(out);
         tot_bytes += samples_lastR.serialize(out);
+
+        tot_bytes += firstR.serialize(out);
+        tot_bytes += first_to_runR.serialize(out);
+
+        tot_bytes += lastR.serialize(out);
+        tot_bytes += last_to_runR.serialize(out);
 
         return tot_bytes;
 
