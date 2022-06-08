@@ -134,54 +134,20 @@ void locate_all(ifstream& in, string patterns)
 
             t3 = high_resolution_clock::now();
 
-            std::pair<
-                ulint,
-                std::vector<std::pair<ulint,br_sample>>
-            > res = idx.maximal_exact_match(p);
+            idx.maximal_exact_match(p);
 
             t4 = high_resolution_clock::now();
 
-            std::vector<ulint> occs;
-            for (auto p: res.second) {
-                auto tmp = idx.locate_sample(p.second);
-                occs.insert(occs.end(),tmp.begin(),tmp.end());
-            }
 
             t5 = high_resolution_clock::now();
 
             count_time += duration_cast<microseconds>(t4-t3).count();
             locate_time += duration_cast<microseconds>(t5-t4).count();
-            occ_tot += occs.size();
             tot_time += duration_cast<microseconds>(t4-t3).count() + duration_cast<microseconds>(t5-t4).count();
 
-
-            if (c) // check occurrences
-            {
-                cout << "length of MEM : " << res.first << endl;
-                cout << "number of MEM occs : " << occs.size() << endl;
-                ulint maxlen = res.first;
-                for (auto pair: res.second)
-                {
-                    ulint offset = pair.first;
-                    auto occs = idx.locate_sample(pair.second);
-                    for (auto o: occs)
-                    {
-                        for (ulint i = 0; i < maxlen; ++i)
-                        {
-                            if (text[o+i] != p[i+offset])
-                            {
-                                cout << "wrong occurrence  occ: " << o << " offset on P: " << offset << endl;
-                            }
-                        }
-                    }
-                }
-            }
-
         }
-        double occ_avg = (double)occ_tot / n;
         
-        cout << endl << occ_avg << " average occurrences per pattern" << endl;
-
+        
         ifs.close();
 
         ulint load = duration_cast<milliseconds>(t2-t1).count();
@@ -189,13 +155,11 @@ void locate_all(ifstream& in, string patterns)
 
         cout << "Number of patterns n = " << n << endl;
         cout << "Pattern length     m = " << m << endl;
-        cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
-
+        
         cout << "LF-mapping time: " << count_time << " microseconds" << endl;
         cout << "Phi        time: " << locate_time << " microseconds" << endl;
         cout << "Total time : " << tot_time << " microseconds" << endl;
         cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
-        cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
     }
     else if (once)
     {
@@ -223,28 +187,28 @@ void locate_all(ifstream& in, string patterns)
 
         t3 = high_resolution_clock::now();
 
-        std::pair<
+        /*std::pair<
             ulint,
             std::vector<std::pair<ulint,br_sample>>
-        > res = idx.maximal_exact_match(p);
+        > res = idx.maximal_exact_match(p);*/
+        idx.maximal_exact_match(p);
 
         t4 = high_resolution_clock::now();
 
-        std::vector<ulint> occs;
+        /*std::vector<ulint> occs;
         for (auto p: res.second) {
             auto tmp = idx.locate_sample(p.second);
             occs.insert(occs.end(),tmp.begin(),tmp.end());
-        }
+        }*/
 
         t5 = high_resolution_clock::now();
 
         count_time += duration_cast<microseconds>(t4-t3).count();
         locate_time += duration_cast<microseconds>(t5-t4).count();
-        occ_tot += occs.size();
         tot_time += duration_cast<microseconds>(t4-t3).count() + duration_cast<microseconds>(t5-t4).count();
 
 
-        if (c) // check occurrences
+        /*if (c) // check occurrences
         {
             cout << "length of MEM : " << res.first << endl;
             cout << "number of MEM occs : " << occs.size() << endl;
@@ -264,7 +228,7 @@ void locate_all(ifstream& in, string patterns)
                     }
                 }
             }
-        }
+        }*/
 
         
 
@@ -273,17 +237,10 @@ void locate_all(ifstream& in, string patterns)
         cout << "Load time  : " << load << " milliseconds" << endl;
 
         cout << "Pattern length     m =  " << m << endl;
-        cout << "Matched maximal length: " << res.first << endl;
-        cout << "Offsets of MEMs: \n    ";
-        for (auto pair: res.second) {
-            cout << pair.first << " ";
-        } cout << endl;
-        cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
-
+        
         cout << "LF-mapping time: " << count_time << " microseconds" << endl;
         cout << "Phi        time: " << locate_time << " microseconds" << endl;
         cout << "Total time : " << tot_time << " microseconds" << endl;
-        cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
     }
 }
 

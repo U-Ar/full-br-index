@@ -1114,37 +1114,37 @@ public:
     }
 
     // gets MEMs 
-    // returns (matched length, [(offset in P, matched sample),])
-    std::pair<
+    /*std::pair<
         ulint,
         std::vector<std::pair<ulint,br_sample>>
-    > 
-    maximal_exact_match(std::string const& pattern)
+    > */
+    void maximal_exact_match(std::string const& pattern)
     {
         std::vector<std::pair<ulint,br_sample>> res;
         ulint m = pattern.size();
         ulint j = 0, l = 0, max_l = 0;
+        bool extended = false;
 
         br_sample sample(get_initial_sample());
+
+        // parameter deciding whether contraction or extension from initial sample is used
+        ulint border = 8;
+
         for (ulint i = 0; i < m; ++i)
         {
             while (j < m)
             {
                 br_sample new_sample = right_extension((uchar)pattern[j],sample);
                 if (new_sample.is_invalid()) break;
+                extended = true;
                 sample = new_sample;
                 l++;
                 j++;
             }
-            if (l == max_l)
+            if (extended)
             {
-                res.push_back(std::pair<ulint,br_sample>(i,sample));
-            }
-            else if (l > max_l)
-            {
-                max_l = l;
-                res.clear();
-                res.push_back(std::pair<ulint,br_sample>(i,sample));
+                //std::cout << "MEM found  offset: " << i << " length: "<< l << std::endl;
+                std::cout << l << std::endl;
             }
             
             if (i == j)
@@ -1155,15 +1155,24 @@ public:
             }
             else 
             {
-                sample = left_contraction(sample);
-                l--;
+                if (l <= border)
+                {
+                    sample = get_initial_sample();
+                    for (ulint k = 0; k < l-1; ++k)
+                    {
+                        sample = right_extension((uchar)pattern[i+k+1],sample);
+                    }
+                    l--;
+                }
+                else {
+                    sample = left_contraction(sample);
+                    l--;
+                }
             }
+            extended = false;
         }
 
-        return std::pair<
-                ulint,
-                std::vector<std::pair<ulint,br_sample>>
-                > (max_l, res);
+        //return std::pair<ulint,std::vector<std::pair<ulint,br_sample>>> (max_l, res);
     }
 
     std::unordered_map<range_t,br_sample,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
