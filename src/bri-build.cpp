@@ -4,6 +4,7 @@
 
 #include "br_index.hpp"
 #include "br_index_limited.hpp"
+#include "br_index_fixed.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -13,15 +14,20 @@ string out_basename = string();
 string input_file = string();
 bool sais = true;
 bool limited = false;
+long length = 0;
 
 void help(){
-	cout << "bri-build: builds the full bidirectional r-index. Extension .bri is automatically added to output index file" << endl << endl;
+	cout << "bri-build: builds the full bidirectional r-index." << endl;
+    cout << "           extension .bri/.bril/.brif is automatically added to output index file." << endl << endl;
 	cout << "Usage: bri-build [options] <input_file_name>" << endl;
 	cout << "   -o <basename>        use <basename> as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
     cout << "   -limited             build limited version of br-index optimized for finding MEMs." << endl;
-    cout << "                        space-efficient, but left-extension and right-contraction are not supported." << endl;
+    cout << "                        space-efficient, but right-contraction is not supported." << endl;
+    cout << "   -fixed <length>      build <length>-dimensional de Bruijn br-index." << endl;
+    cout << "                        contractions are supported for only fixed length pattern." << endl;
+    cout << "                        (uncompatible with -limited flag)" << endl;
 	cout << "   -divsufsort          use divsufsort algorithm to build the BWT (fast, 7.5n Bytes of RAM). By default,"<<endl;
-	cout << "                        SE-SAIS is used (about 4 time slower than divsufsort, 4n Bytes of RAM)."<<endl;
+	cout << "                        SE-SAIS is used (about 4 times slower than divsufsort, 4n Bytes of RAM)."<<endl;
     cout << "   <input_file_name>    input text file." << endl;
 	exit(0);
 }
@@ -47,13 +53,28 @@ void parse_args(char** argv, int argc, int &ptr){
 	}
     else if (s.compare("-divsufsort") == 0 )
     {
-
 		sais = false;
-
 	}
     else if (s.compare("-limited") == 0)
     {
         limited = true;
+    }
+    else if (s.compare("-fixed") == 0)
+    {
+        if(ptr >= argc-1){
+			cout << "Error: missing parameter after -fixed option." << endl;
+			help();
+		}
+
+		char* e;
+        length = strtol(argv[ptr],&e,10);
+
+        if(*e != '\0' || length <= 0){
+            cout << "Error: illegal or nonpositive value after -fixed option." << endl;
+            help();
+        }
+
+		ptr++;
     }
     else
     {
@@ -87,13 +108,20 @@ int main(int argc, char** argv)
     
     string idx_file = out_basename;
 
-    cout << "Building br-index of input file " << input_file << endl;
-    if (!limited)
+    if (length > 0)
     {
-        cout << "Index will be saved to " << idx_file << ".bri" << endl;
+        cout << "Building fixed length br-index on input file " << input_file << endl;
+        cout << "Index will be saved to " << idx_file << ".brif" << endl;
     }
-    else {
+    else if (limited)
+    {
+        cout << "Building limited br-index on input file " << input_file << endl;
         cout << "Index will be saved to " << idx_file << ".bril" << endl;
+    }
+    else 
+    {
+        cout << "Building full br-index on input file " << input_file << endl;
+        cout << "Index will be saved to " << idx_file << ".bri" << endl;
     }
 
     string input;
@@ -106,15 +134,19 @@ int main(int argc, char** argv)
         input = buffer.str();
     }
 
-
-    if (!limited)
+    if (length > 0)
     {
-        br_index<> idx(input,sais);
+        br_index_fixed<> idx(input,(unsigned long)length,sais);
+        idx.save_to_file(idx_file);
+    } 
+    else if (limited)
+    {
+        br_index_limited<> idx(input,sais);
         idx.save_to_file(idx_file);
     }
     else 
     {
-        br_index_limited<> idx(input,sais);
+        br_index<> idx(input,sais);
         idx.save_to_file(idx_file);
     }
     
@@ -123,5 +155,4 @@ int main(int argc, char** argv)
     ulint total = duration_cast<duration<double, std::ratio<1>>>(t2-t1).count();
     cout << "Build time: " << get_time(total) << endl;
 
-    out.close();
 }

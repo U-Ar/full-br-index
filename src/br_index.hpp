@@ -15,59 +15,6 @@
 
 namespace bri {
 
-// sample maintained during the search
-struct br_sample {
-    /*
-     * state variables for left_extension & right_extension
-     * range: SA range of P
-     * j: SA[p]
-     * d: offset between starting position of the pattern & j
-     * rangeR: correspondents to range in reversed text
-     * len: current pattern length
-     */
-    range_t range, rangeR;
-    ulint j, d, len;
-    
-    br_sample(): range(), rangeR() {}
-
-    br_sample(range_t range_, 
-              range_t rangeR_,
-              ulint j_,
-              ulint d_,
-              ulint len_) 
-              :
-              range(range_),
-              rangeR(rangeR_),
-              j(j_),
-              d(d_),
-              len(len_) {}
-
-    void set_values(range_t range_, 
-                    range_t rangeR_,
-                    ulint j_,
-                    ulint d_,
-                    ulint len_)
-    {
-        range = range_;
-        rangeR = rangeR_;
-        j = j_;
-        d = d_;
-        len = len_;
-    }
-
-    // the pattern does not exist
-    bool is_invalid()
-    {
-        return (range.first > range.second) || (rangeR.first > rangeR.second);
-    }
-
-    // range size
-    ulint size()
-    {
-        return range.second + 1 - range.first;
-    }
-};
-
 template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
@@ -154,6 +101,8 @@ public:
         sdsl::construct_sa<8>(cc);
         // cache ISA 
         sdsl::construct_isa(cc);
+        // cache LCP
+        sdsl::construct_lcp_kasai<8>(cc);
 
         
         sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
@@ -166,6 +115,7 @@ public:
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
 
 
 
@@ -187,6 +137,8 @@ public:
         sdsl::construct_sa<8>(ccR);
         // cache ISAR
         sdsl::construct_isa(ccR);
+        // cache LCPR
+        sdsl::construct_lcp_kasai<8>(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
@@ -198,6 +150,7 @@ public:
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, ccR));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_LCP, ccR));
 
 
 

@@ -15,18 +15,12 @@ public:
 
     /*
      * constructor with cache_config.
-     * assume text and SA and ISA are cached by the config.
+     * assume LCP and ISA are cached by the config.
      */
     permuted_lcp(sdsl::cache_config& cc)
     {
-        // construct ISA
-        //sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
         sdsl::int_vector<> isa;
         sdsl::load_from_file(isa, sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
-
-        // construct LCP
-        sdsl::construct_lcp_kasai<8>(cc);
-        //sdsl::int_vector_buffer<> lcp(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
         
         sdsl::int_vector<> lcp;
         sdsl::load_from_file(lcp, sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
@@ -94,7 +88,6 @@ public:
         ones = sparse_bitvector_t(ones_bv);
         zeros = sparse_bitvector_t(zeros_bv);
 
-        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
 
     }
 

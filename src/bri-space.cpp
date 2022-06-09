@@ -2,16 +2,19 @@
 
 #include "br_index.hpp"
 #include "br_index_limited.hpp"
+#include "br_index_fixed.hpp"
 
 using namespace std;
 using namespace bri;
 
 bool limited = false;
+bool fixed_length = false;
 
 void help(){
 	cout << "bri-space: breakdown of index space usage" << endl;
 	cout << "Usage:       bri-space [options] <index>" << endl;
 	cout << "   -limited  use the limited version." << endl;
+	cout << "   -fixed    use the fixed length version(uncompatible with -limited)." << endl;
 	cout << "   <index>   index file (with extension .bri/.bril)" << endl;
 	exit(0);
 }
@@ -27,6 +30,12 @@ void parse_args(char** argv, int argc, int &ptr){
     {
 
         limited = true;
+
+    }
+	else if (s.compare("-fixed") == 0)
+    {
+
+        fixed_length = true;
 
     }
     else
@@ -45,11 +54,21 @@ int main(int argc, char** argv){
 	int ptr = 1;
 	while (ptr < argc-1) parse_args(argv, argc, ptr);
 
-	if (!limited)
+	if (fixed_length)
 	{
-		br_index<> idx;
+		br_index_fixed<> idx;
 
-		cout << "Loading full-br-index" << endl;
+		cout << "Loading br-index(fixed length) from " << argv[ptr] << endl;
+		idx.load_from_file(argv[ptr]);
+		cout << "--- Statistics of the text and the breakdown of the br-index space usage ---" << endl;
+		
+		auto space = idx.print_space();
+	}
+	else if (limited)
+	{
+		br_index_limited<> idx;
+
+		cout << "Loading br-index(limited) from " << argv[ptr] << endl;
 		idx.load_from_file(argv[ptr]);
 		cout << "--- Statistics of the text and the breakdown of the br-index space usage ---" << endl;
 		
@@ -57,9 +76,9 @@ int main(int argc, char** argv){
 	}
 	else 
 	{
-		br_index_limited<> idx;
+		br_index<> idx;
 
-		cout << "Loading br-index(limited)" << endl;
+		cout << "Loading full-br-index from " << argv[ptr] << endl;
 		idx.load_from_file(argv[ptr]);
 		cout << "--- Statistics of the text and the breakdown of the br-index space usage ---" << endl;
 		

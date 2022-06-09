@@ -3,12 +3,14 @@
 #include <cstdlib>
 
 #include "br_index.hpp"
+#include "br_index_limited.hpp"
 #include "utils.hpp"
 
 using namespace bri;
 using namespace std;
 
 string check = string();
+bool limited = false;
 bool once = false;
 
 void help()
@@ -16,6 +18,7 @@ void help()
 	cout << "bri-mem: locate maximal exact matches of the input patterns." << endl;
 
 	cout << "Usage: bri-mem [options] <index> <patterns>" << endl;
+    cout << "   -limited     use the limited version of br-index." << endl;
 	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
     cout << "   -once        use a text file as one pattern instead of pattern file" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
@@ -46,6 +49,10 @@ void parse_args(char** argv, int argc, int &ptr){
     else if (s.compare("-once") == 0)
     {
         once = true;
+    }
+    else if (s.compare("-limited") == 0)
+    {
+        limited = true;
     }
     else
     {
@@ -263,7 +270,15 @@ int main(int argc, char** argv)
 
     cout << "Loading br-index" << endl;
 
-    locate_all<br_index<> >(in, patt_file);
+    if (limited)
+    {
+        locate_all<br_index_limited<> >(in, patt_file);
+    }
+    else 
+    {
+        locate_all<br_index<> >(in, patt_file);
+    }
+    
 
     in.close();
 
