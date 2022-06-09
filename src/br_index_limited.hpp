@@ -1,11 +1,11 @@
 /*
- * full bi-directional r-index 
- *  left/right - extension/contraction
+ * limited bi-directional r-index (optimized for finding MEMs)
+ *  left-contraction right-extension
  *  locate
  */
 
-#ifndef INCLUDED_BR_INDEX_HPP
-#define INCLUDED_BR_INDEX_HPP
+#ifndef INCLUDED_BR_INDEX_LIMTIED_HPP
+#define INCLUDED_BR_INDEX_LIMITED_HPP
 
 #include "definitions.hpp"
 #include "rle_string.hpp"
@@ -15,70 +15,17 @@
 
 namespace bri {
 
-// sample maintained during the search
-struct br_sample {
-    /*
-     * state variables for left_extension & right_extension
-     * range: SA range of P
-     * j: SA[p]
-     * d: offset between starting position of the pattern & j
-     * rangeR: correspondents to range in reversed text
-     * len: current pattern length
-     */
-    range_t range, rangeR;
-    ulint j, d, len;
-    
-    br_sample(): range(), rangeR() {}
-
-    br_sample(range_t range_, 
-              range_t rangeR_,
-              ulint j_,
-              ulint d_,
-              ulint len_) 
-              :
-              range(range_),
-              rangeR(rangeR_),
-              j(j_),
-              d(d_),
-              len(len_) {}
-
-    void set_values(range_t range_, 
-                    range_t rangeR_,
-                    ulint j_,
-                    ulint d_,
-                    ulint len_)
-    {
-        range = range_;
-        rangeR = rangeR_;
-        j = j_;
-        d = d_;
-        len = len_;
-    }
-
-    // the pattern does not exist
-    bool is_invalid()
-    {
-        return (range.first > range.second) || (rangeR.first > rangeR.second);
-    }
-
-    // range size
-    ulint size()
-    {
-        return range.second + 1 - range.first;
-    }
-};
-
 template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
 >
-class br_index {
+class br_index_limited {
 
 public:
 
     using triple = std::tuple<range_t, ulint, ulint>;
 
-    br_index() {}
+    br_index_limited() {}
 
     /*
      * constructor. 
@@ -86,7 +33,7 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index(std::string const& input, bool sais = true)
+    br_index_limited(std::string const& input, bool sais = true)
     {
         
         this->sais = sais;
@@ -185,19 +132,15 @@ public:
         
         // cache SAR
         sdsl::construct_sa<8>(ccR);
-        // cache ISAR
-        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
 
-        // plcpR is needed for full index
-        plcpR = permuted_lcp<>(ccR);
+        // plcpR is not needed for limited version
 
         // remove cache of textR and SAR
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, ccR));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
-        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
 
 
 
@@ -271,21 +214,13 @@ public:
         std::cout << "(4/4) Building predecessor for toehold lemma & Phi/Phi^{-1} function ..." << std::flush;
 
         
-        samples_last = sdsl::int_vector<>(r,0,log_n);
-        samples_first = sdsl::int_vector<>(r,0,log_n);
-        
         samples_firstR = sdsl::int_vector<>(rR,0,log_n);
         samples_lastR = sdsl::int_vector<>(rR,0,log_n);
 
-        for (ulint i = 0; i < r; ++i)
-        {
-            samples_last[i] = samples_last_vec[i].first;
-            samples_first[i] = samples_first_vec[i].first;
-        }
         for (ulint i = 0; i < rR; ++i)
         {
-            samples_lastR[i] = samples_last_vecR[i].first;
             samples_firstR[i] = samples_first_vecR[i].first;
+            samples_lastR[i] = samples_last_vecR[i].first;
         }
 
         // sort samples of first positions in runs according to text position
@@ -293,10 +228,6 @@ public:
         // sort samples of last positions in runs according to text position
         std::sort(samples_last_vec.begin(), samples_last_vec.end());
 
-        // sort samples of first positions in runs according to text position
-        std::sort(samples_first_vecR.begin(), samples_first_vecR.end());
-        // sort samples of last positions in runs according to text position
-        std::sort(samples_last_vecR.begin(), samples_last_vecR.end());
 
         // build Elias-Fano predecessor
         {
@@ -335,46 +266,6 @@ public:
         for (ulint i = 0; i < samples_last_vec.size(); ++i)
         {
             last_to_run[i] = samples_last_vec[i].second;
-        }
-
-
-        // build Elias-Fano predecessor for reversed direction
-        {
-            std::vector<bool> first_bvR(bwt_sR.size(),false);
-            for (auto p: samples_first_vecR)
-            {
-                assert(p.first < first_bvR.size());
-                first_bvR[p.first] = true;
-            }
-            firstR = sparse_bitvector_t(first_bvR);
-        }
-        {
-            std::vector<bool> last_bvR(bwt_sR.size(),false);
-            for (auto p: samples_last_vecR)
-            {
-                assert(p.first < last_bvR.size());
-                last_bvR[p.first] = true;
-            }
-            lastR = sparse_bitvector_t(last_bvR);
-        }
-
-        assert(firstR.rank(firstR.size()) == rR);
-        assert(lastR.rank(lastR.size()) == rR);
-
-        first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
-
-        last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
-
-        // construct first_to_run
-        for (ulint i = 0; i < samples_first_vecR.size(); ++i)
-        {
-            first_to_runR[i] = samples_first_vecR[i].second;
-        }
-
-        // construct last_to_run
-        for (ulint i = 0; i < samples_last_vecR.size(); ++i)
-        {
-            last_to_runR[i] = samples_last_vecR[i].second;
         }
 
         // release ISA cache
@@ -490,58 +381,6 @@ public:
         return (prev_sample + delta) % bwt.size();
     }
 
-    /*
-     * PhiR function
-     * get SAR[i] from SAR[i+1]
-     */
-    ulint PhiR(ulint i)
-    {
-        assert(i != bwtR.size() - 1);
-
-        ulint jr = firstR.predecessor_rank_circular(i);
-
-        assert(jr <= rR - 1);
-
-        ulint k = firstR.select(jr);
-
-        assert(jr < rR - 1 || k == bwtR.size() - 1);
-
-        // distance from predecessor
-        ulint delta = k < i ? i - k : i + 1;
-
-        // check if Phi(SA[0]) is not called
-        assert(first_to_runR[jr] > 0);
-
-        ulint prev_sample = samples_lastR[first_to_runR[jr]-1];
-
-        return (prev_sample + delta) % bwtR.size();
-    }
-    /*
-     * PhiR inverse
-     * get SAR[i] from SAR[i-1]
-     */
-    ulint PhiIR(ulint i)
-    {
-        //assert(i != last_SA_val);
-
-        ulint jr = lastR.predecessor_rank_circular(i);
-
-        assert(jr <= rR - 1);
-
-        ulint k = lastR.select(jr);
-
-        assert(jr < rR - 1 || k == bwtR.size() - 1);
-
-        // distance from predecessor
-        ulint delta = k < i ? i - k : i + 1;
-
-        // check if Phi(SA[0]) is not called
-        assert(last_to_runR[jr] < rR-1);
-
-        ulint prev_sample = samples_firstR[last_to_runR[jr]+1];
-
-        return (prev_sample + delta) % bwtR.size();
-    }
 
     ulint LF(ulint i)
     {
@@ -620,93 +459,15 @@ public:
     /*
      * get a sample corresponding to an empty string
      */
-    br_sample get_initial_sample(bool right=true)
+    br_sample get_initial_sample()
     {
-        if (!right) {
-            return br_sample(full_range(), // entire SA range
-                            full_range(), // entire SAR range
-                            (samples_last[r-1]+1) % bwt.size(), // arbitrary sample
-                            0,            // offset 0
-                            0);           // null pattern
-        }
-        else 
-        {
-            return br_sample(full_range(), // entire SA range
-                            full_range(), // entire SAR range
-                            (samples_lastR[rR-1]+1) % bwtR.size(), // arbitrary sample
-                            0,            // offset 0
-                            0);           // null pattern
-        }
+        return br_sample(full_range(), // entire SA range
+                        full_range(), // entire SAR range
+                        (samples_last[r-1]+1) % bwt.size(), // arbitrary sample
+                        0,            // offset 0
+                        0);           // null pattern
     }
 
-    /*
-     * search the pattern cP (P:the current pattern)
-     * returns SA&SAR range corresponding to cP
-     * 
-     * full version, update ranges for SA and SAR simultaneously
-     * 
-     * assumes c is original char (not remapped)
-     */
-    br_sample left_extension(uchar c, br_sample const& prev_sample)
-    {
-        // replace c with internal representation
-        c = remap[c];
-
-        br_sample sample(prev_sample);
-
-        // get SA range of cP
-        sample.range = LF(prev_sample.range,c);
-
-        // pattern cP was not found
-        if (sample.is_invalid()) return sample;
-
-        // cP and aP occurs for some a s.t. a != c
-        if (prev_sample.range.second - prev_sample.range.first != 
-            sample.range.second      - sample.range.first)
-        {
-            
-            // accumulated occ of aP (for any a s.t. a < c)
-            ulint acc = 0;
-            for (ulint a = 1; a < c; ++a)
-            {
-                range_t smaller_range = LF(prev_sample.range,(uchar)a);
-                acc += (smaller_range.second+1) - smaller_range.first;
-            }
-            // get SAR range of (cP)^R
-            sample.rangeR.second = sample.rangeR.first + acc + sample.range.second - sample.range.first;
-            sample.rangeR.first = sample.rangeR.first + acc;
-
-
-            // fint last c in range and get its sample
-            // there must be at least one c due to the previous if clause
-            ulint rnk = bwt.rank(prev_sample.range.second+1,c);
-            assert(rnk > 0);
-
-            // update p by corresponding BWT position
-            ulint p = bwt.select(rnk-1,c);
-            assert(p >= prev_sample.range.first && p <= prev_sample.range.second);
-
-            // run number of position p
-            ulint run_of_p = bwt.run_of_position(p);
-
-            // update j by SA[p]
-            if (bwt[prev_sample.range.second] == c)
-                sample.j = samples_first[run_of_p];
-            else
-                sample.j = samples_last[run_of_p];
-
-            // reset d
-            sample.d = 0;
-
-        }
-        else // only c precedes P 
-        {
-            // increment offset by 1
-            sample.d++;
-        }
-        sample.len++;
-        return sample;
-    }
 
     /*
      * search the pattern Pc (P:the current pattern)
@@ -842,85 +603,7 @@ public:
 
         return sample;
     }
-    /*
-     * match the pattern P from the current pattern Pc
-     * return SAR&SA range corresponding to P
-     */
-    br_sample right_contraction(br_sample const& prev_sample)
-    {
-        br_sample sample(prev_sample);
-        assert(sample.len > 0);
 
-        // get PsiR(sR), Psi(eR)
-        ulint psiR_sR = FLR(sample.rangeR.first);
-        ulint psiR_eR = FLR(sample.rangeR.second);
-
-        uchar c = bwtR[psiR_sR];
-
-        // updating range, rangeR
-        ulint run_psiR_sR = bwtR.run_of_position(psiR_sR);
-        ulint run_start = bwtR.run_start(run_psiR_sR);
-        ulint run_psiR_eR = bwtR.run_of_position(psiR_eR);
-        ulint run_end = bwtR.run_end(run_psiR_eR);
-
-        assert(run_start <= psiR_sR);
-        sample.rangeR.first = psiR_sR;
-        if (run_start == psiR_sR) {
-            ulint pos = (samples_firstR[run_psiR_sR]+1) % bwtR.size();
-
-            while (sample.rangeR.first > 0 && plcpR[pos] >= sample.len-1)
-            {
-                sample.rangeR.first--;
-                pos = PhiR(pos);
-            }
-        }
-        assert(psiR_eR <= run_end);
-        sample.rangeR.second = psiR_eR;
-        if (run_end == psiR_eR) {
-            ulint pos = (samples_lastR[run_psiR_eR]+1) % bwtR.size();
-
-            while (sample.rangeR.second < bwtR.size()-1)
-            {
-                pos = PhiIR(pos);
-                if (plcpR[pos] < sample.len-1) break;
-                sample.rangeR.second++;
-            }
-        }
-
-        // accumulated occ of Pa (for any a s.t. a < c)
-        ulint acc = 0;
-        for (ulint a = 1; a < c; ++a)
-        {
-            range_t smaller_rangeR = LFR(sample.rangeR,(uchar)a);
-            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
-        }
-        // get range for SA
-        sample.range.first -= acc;
-        sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
-
-        // updating j, d, len (very simple for contraction)
-        if (sample.d == sample.len - 1) 
-        {
-            sample.j--; sample.d--;
-        }
-        sample.len--;
-
-        return sample;
-    }
-
-    /*
-     * backward search P[left...right]
-     */
-    br_sample backward_search(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
-    {
-        br_sample res(sample);
-        for (ulint i = right + 1; i-- > left; )
-        {
-            res = left_extension(pattern[i],res);
-            if (res.is_invalid()) return res;
-        }
-        return res;
-    }
 
     /*
      * forward search P[left...right]
@@ -1013,55 +696,29 @@ public:
     /*
      * count the number of a given pattern
      */
-    ulint count(std::string const& pattern, bool right=false)
+    ulint count(std::string const& pattern)
     {
-        if (right) 
+        br_sample sample(get_initial_sample(true));
+        for (size_t i = 0; i < pattern.size(); ++i)
         {
-            br_sample sample(get_initial_sample(true));
-            for (size_t i = 0; i < pattern.size(); ++i)
-            {
-                sample = right_only(pattern[i],sample);
-                if (sample.is_invalid()) return {};
-            }
-            return count_sample(sample);
+            sample = right_only(pattern[i],sample);
+            if (sample.is_invalid()) return {};
         }
-        else 
-        {
-            br_sample sample(get_initial_sample());
-            for (size_t i = 0; i < pattern.size(); ++i)
-            {
-                sample = left_only(pattern[pattern.size()-1-i],sample);
-                if (sample.is_invalid()) return {};
-            }
-            return count_sample(sample);
-        }
+        return count_sample(sample);
     }
 
     /*
      * locate occurrences of a given pattern
      */
-    std::vector<ulint> locate(std::string const& pattern, bool right=false)
+    std::vector<ulint> locate(std::string const& pattern)
     {
-        if (right) 
+        br_sample sample(get_initial_sample(true));
+        for (size_t i = 0; i < pattern.size(); ++i)
         {
-            br_sample sample(get_initial_sample(true));
-            for (size_t i = 0; i < pattern.size(); ++i)
-            {
-                sample = right_only(pattern[i],sample);
-                if (sample.is_invalid()) return {};
-            }
-            return locate_sample(sample);
+            sample = right_only(pattern[i],sample);
+            if (sample.is_invalid()) return {};
         }
-        else 
-        {
-            br_sample sample(get_initial_sample());
-            for (size_t i = 0; i < pattern.size(); ++i)
-            {
-                sample = left_only(pattern[pattern.size()-1-i],sample);
-                if (sample.is_invalid()) return {};
-            }
-            return locate_sample_backward(sample);
-        }
+        return locate_sample(sample);
     }
 
     ulint count_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
@@ -1081,7 +738,7 @@ public:
         return locate_samples(samples);
     }
 
-    std::unordered_map<range_t,br_sample,range_hash> search_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
+    /*std::unordered_map<range_t,br_sample,range_hash> search_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
     {
         std::unordered_map<range_t,br_sample,range_hash> res;
         ulint m = pattern.size();
@@ -1112,7 +769,7 @@ public:
         }
 
         return res;
-    }
+    }*/
 
     // gets MEMs 
     /*std::pair<
@@ -1176,254 +833,6 @@ public:
         //return std::pair<ulint,std::vector<std::pair<ulint,br_sample>>> (max_l, res);
     }
 
-    std::unordered_map<range_t,br_sample,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
-    {
-        // P[0,m1-1], P[m1,m2-1], P[m2,m-1]
-        std::unordered_map<range_t,br_sample,range_hash> res;
-        ulint m = pattern.size();
-        br_sample init_sample(get_initial_sample());
-
-        br_sample sample(backward_search(pattern,m1,m2-1,init_sample));
-        if (sample.is_invalid()) return res;
-
-        forward_dfs(res,pattern,m,allowed_mis,m1,m2,0,sample);
-
-        return res;
-    }
-
-    void backward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
-                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
-    {
-        uchar c = remap[pattern[left_pos]];
-
-        //std::cout << mis << " " << allowed_mis << "  ";
-
-        if (mis == allowed_mis)
-        {
-            ulint acc = 0;
-
-            br_sample sample(prev_sample);
-
-            sample.range = LF(prev_sample.range,c);
-            if (sample.is_invalid()) return;
-
-            if (sample.range.second - sample.range.first == 
-                prev_sample.range.second - prev_sample.range.first)
-            {
-                sample.d++;
-            } 
-            else 
-            {
-                for (ulint a = 1; a < c; ++a)
-                {
-                    range_t smaller_range = LF(prev_sample.range,(uchar)a);
-                    acc += smaller_range.second + 1 - smaller_range.first;
-                }
-
-                sample.rangeR.first = sample.rangeR.first + acc;
-                sample.rangeR.second = sample.rangeR.first + sample.range.second - sample.range.first;
-                ulint rnk = bwt.rank(prev_sample.range.second+1,c);
-                ulint p = bwt.select(rnk-1,c);
-                ulint run_of_p = bwt.run_of_position(p);
-                if (bwt[prev_sample.range.second] == c)
-                    sample.j = samples_first[run_of_p];
-                else
-                    sample.j = samples_last[run_of_p];
-                sample.d = 0;
-            }
-            sample.len++;
-
-            if (left_pos == 0)
-            {
-                res[sample.range] = sample;
-            }
-            else 
-            {
-                backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
-            }
-            
-        } 
-        else // mis < allowed_mis 
-        {
-            ulint acc = 0;
-        
-            for (ulint a = 1; a < sigma+1; ++a)
-            {
-                br_sample sample(prev_sample);
-
-                sample.range = LF(prev_sample.range,(uchar)a);
-                if (sample.is_invalid()) continue;
-
-                if (a == 1)
-                {
-                    acc++;
-                    continue;
-                }
-                
-                if (sample.range.second - sample.range.first == 
-                    prev_sample.range.second - prev_sample.range.first)
-                {
-                    sample.d++;
-                }
-                else // sample.size() != prev_sample.size()
-                {
-                    sample.rangeR.first = sample.rangeR.first + acc;
-                    sample.rangeR.second = sample.rangeR.first + sample.range.second - sample.range.first;
-                    ulint rnk = bwt.rank(prev_sample.range.second+1,a);
-                    ulint p = bwt.select(rnk-1,a);
-                    ulint run_of_p = bwt.run_of_position(p);
-                    if (bwt[prev_sample.range.second] == a)
-                        sample.j = samples_first[run_of_p];
-                    else
-                        sample.j = samples_last[run_of_p];
-                    sample.d = 0;
-                }
-                sample.len++;
-                acc += sample.range.second + 1 - sample.range.first;
-
-                if (c == a)
-                {
-                    if (left_pos == 0)
-                    {
-                        res[sample.range] = sample;
-                    }
-                    else 
-                    {
-                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
-                    }
-                }
-                else // c != a
-                {
-                    if (left_pos == 0)
-                    {
-                        res[sample.range] = sample;
-                    }
-                    else
-                    {
-                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis+1,sample);
-                    }
-                }
-            }
-        }   
-    }
-
-    void forward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
-                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
-    {
-        uchar c = remap[pattern[right_pos]];
-
-        if (mis == allowed_mis)
-        {
-            ulint acc = 0;
-
-            br_sample sample(prev_sample);
-
-            sample.rangeR = LFR(prev_sample.rangeR,c);
-            if (sample.is_invalid()) return;
-
-
-            if (sample.rangeR.second - sample.rangeR.first != 
-                prev_sample.rangeR.second - prev_sample.rangeR.first)
-            {
-                for (ulint a = 1; a < c; ++a)
-                {
-                    range_t smaller_rangeR = LFR(prev_sample.rangeR,(uchar)a);
-                    acc += (smaller_rangeR.second + 1) - smaller_rangeR.first;
-                }
-
-                sample.range.first = sample.range.first + acc;
-                sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
-                ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,c);
-                ulint p = bwtR.select(rnk-1,c);
-                ulint run_of_p = bwtR.run_of_position(p);
-                if (bwtR[prev_sample.rangeR.second] == c)
-                    sample.j = bwt.size()-2-samples_firstR[run_of_p];
-                else
-                    sample.j = bwt.size()-2-samples_lastR[run_of_p];
-                sample.d = sample.len;
-            }
-            sample.len++;
-
-            if (left_pos == 0 && right_pos >= m - 1)
-            {
-                res[sample.range] = sample;
-            }
-            else if (right_pos >= m-1)
-            {
-                backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
-            }
-            else
-            {
-                forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis,sample);
-            }
-        } 
-        else // mis < allowed_mis 
-        {
-            ulint acc = 0;
-        
-            for (ulint a = 1; a < sigma+1; ++a)
-            {
-                br_sample sample(prev_sample);
-
-                sample.rangeR = LFR(prev_sample.rangeR,(uchar)a);
-                if (sample.is_invalid()) continue;
-
-                if (a == 1)
-                {
-                    acc++;
-                    continue;
-                }
-                
-                if (sample.rangeR.second - sample.rangeR.first != 
-                    prev_sample.rangeR.second - prev_sample.rangeR.first)
-                {
-                    sample.range.first = sample.range.first + acc;
-                    sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
-                    ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,a);
-                    ulint p = bwtR.select(rnk-1,a);
-                    ulint run_of_p = bwtR.run_of_position(p);
-                    if (bwtR[prev_sample.rangeR.second] == a)
-                        sample.j = bwt.size()-2-samples_firstR[run_of_p];
-                    else
-                        sample.j = bwt.size()-2-samples_lastR[run_of_p];
-                    sample.d = sample.len;
-                }
-                sample.len++;
-                acc += sample.range.second + 1 - sample.range.first;
-
-                if (c == a)
-                {
-                    if (left_pos == 0 && right_pos >= m - 1)
-                    {
-                        res[sample.range] = sample;
-                    }
-                    else if (right_pos >= m - 1)
-                    {
-                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
-                    }
-                    else
-                    {
-                        forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis,sample);
-                    }
-                }
-                else // c != a
-                {
-                    if (left_pos == 0 && right_pos >= m - 1)
-                    {
-                        res[sample.range] = sample;
-                    }
-                    else if (right_pos >= m - 1)
-                    {
-                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis+1,sample);
-                    }
-                    else
-                    {
-                        forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis+1,sample);
-                    }
-                }
-            }
-        }
-    }
 
     /*
      * get BWT[i] or BWT^R[i]
@@ -1496,9 +905,6 @@ public:
         w_bytes += bwt.serialize(out);
         w_bytes += bwtR.serialize(out);
 
-        w_bytes += samples_first.serialize(out);
-        w_bytes += samples_last.serialize(out);
-
         w_bytes += first.serialize(out);
         w_bytes += first_to_run.serialize(out);
 
@@ -1508,14 +914,7 @@ public:
         w_bytes += samples_firstR.serialize(out);
         w_bytes += samples_lastR.serialize(out);
 
-        w_bytes += firstR.serialize(out);
-        w_bytes += first_to_runR.serialize(out);
-
-        w_bytes += lastR.serialize(out);
-        w_bytes += last_to_runR.serialize(out);
-
         w_bytes += plcp.serialize(out);
-        w_bytes += plcpR.serialize(out);
 
         return w_bytes;
     
@@ -1543,9 +942,6 @@ public:
         r = bwt.number_of_runs();
         rR = bwtR.number_of_runs();
 
-        samples_first.load(in);
-        samples_last.load(in);
-
         first.load(in);
         first_to_run.load(in);
 
@@ -1555,24 +951,17 @@ public:
         samples_firstR.load(in);
         samples_lastR.load(in);
 
-        firstR.load(in);
-        first_to_runR.load(in);
-
-        lastR.load(in);
-        last_to_runR.load(in);
-
         plcp.load(in);
-        plcpR.load(in);
 
     }
 
     /*
-     * save index to "{path_prefix}.bri" file
+     * save index to "{path_prefix}.bril" file
      */
     void save_to_file(std::string const& path_prefix)
     {
 
-        std::string path = path_prefix + ".bri";
+        std::string path = path_prefix + ".bril";
         
         std::ofstream out(path);
         serialize(out);
@@ -1594,7 +983,7 @@ public:
 
     ulint text_size() { return bwt.size() - 1; }
 
-    ulint bwt_size(bool reversed=false) { return bwt.size(); }
+    ulint bwt_size() { return bwt.size(); }
 
     uchar get_terminator() {
         return TERMINATOR;
@@ -1624,20 +1013,10 @@ public:
         std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
 
         tot_bytes += plcp.print_space();
-        tot_bytes += plcpR.print_space();
 
         std::ofstream out("/dev/null");
 
         ulint bytes = 0;
-
-        
-        bytes =  samples_first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << " bytes" << std::endl;
-
-        bytes =  samples_last.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_last: " << bytes << " bytes" << std::endl;
 
 
         bytes =  first.serialize(out);
@@ -1667,24 +1046,6 @@ public:
         std::cout << "samples_lastR: " << bytes << " bytes" << std::endl;
 
 
-        bytes =  firstR.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "firstR: " << bytes << " bytes" << std::endl;
-
-        bytes =  first_to_runR.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "first_to_runR: " << bytes << " bytes" << std::endl;
-
-
-        bytes =  lastR.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "lastR: " << bytes << " bytes" << std::endl;
-
-        bytes =  last_to_runR.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "last_to_runR: " << bytes << " bytes" << std::endl;
-
-
         std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
         std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl;
 
@@ -1710,12 +1071,8 @@ public:
         tot_bytes += bwtR.get_space();
 
         tot_bytes += plcp.get_space();
-        tot_bytes += plcpR.get_space();
 
         std::ofstream out("/dev/null");
-
-        tot_bytes += samples_first.serialize(out);
-        tot_bytes += samples_last.serialize(out);
 
         tot_bytes += first.serialize(out);
         tot_bytes += first_to_run.serialize(out);
@@ -1726,55 +1083,11 @@ public:
         tot_bytes += samples_firstR.serialize(out);
         tot_bytes += samples_lastR.serialize(out);
 
-        tot_bytes += firstR.serialize(out);
-        tot_bytes += first_to_runR.serialize(out);
-
-        tot_bytes += lastR.serialize(out);
-        tot_bytes += last_to_runR.serialize(out);
-
         return tot_bytes;
 
     }
 
 private:
-
-    /*
-     * only updates range for SA
-     * use when you only search backward
-     * 
-     * assumes sample is SA[r] if range is [l,r]
-     * assumes c is original char (not remapped)
-     */
-    br_sample left_only(uchar c, br_sample const& prev_sample)
-    {
-        // replace c with internal representation
-        c = remap[c];
-
-        br_sample sample(prev_sample);
-
-        // get SA range of cP
-        sample.range = LF(prev_sample.range,c);
-
-        // pattern cP was not found
-        if (sample.is_invalid()) return sample;
-
-        if (bwt[prev_sample.range.second] == c)
-        {
-            sample.d++;
-        } 
-        else 
-        {
-            ulint rnk = bwt.rank(prev_sample.range.second,c);
-            rnk--;
-            ulint k = bwt.select(rnk,c);
-            ulint run_of_k = bwt.run_of_position(k);
-            sample.j = samples_last[run_of_k];
-            sample.d = 0;
-        }
-        sample.len++;
-
-        return sample;
-    }
 
     /*
      * only updates range for SAR
@@ -1810,21 +1123,6 @@ private:
     }
 
     /*
-     * backward search P[left...right]
-     * range for SAR is not updated
-     */
-    br_sample backward_only(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
-    {
-        br_sample res(sample);
-        for (ulint i = right + 1; i-- > left; )
-        {
-            res = left_only(pattern[i],res);
-            if (res.is_invalid()) return res;
-        }
-        return res;
-    }
-
-    /*
      * forward search P[left...right]
      * range for SA is not updated
      */
@@ -1835,31 +1133,6 @@ private:
         {
             res = right_only(pattern[i],res);
             if (res.is_invalid()) return res;
-        }
-        return res;
-    }
-
-    /*
-     * locate occurrences of current pattern P 
-     * use while backward searching only (since it assumes sample is SA[r] when SA range is [l,r])
-     * 
-     * return them as std::vector
-     * (space consuming if result is big)
-     */
-    std::vector<ulint> locate_sample_backward(br_sample const& sample)
-    {
-        ulint sa = sample.j - sample.d;
-        ulint n_occ = sample.range.second + 1 - sample.range.first;
-
-        std::vector<ulint> res(n_occ);
-        if (n_occ > 0)
-        {
-            res[0] = sa;
-            for (ulint i = 1; i < n_occ; ++i)
-            {
-                sa = Phi(sa);
-                res[i] = sa;
-            }
         }
         return res;
     }
@@ -1964,10 +1237,6 @@ private:
     rle_string_t bwtR;
     ulint terminator_positionR = 0;
     ulint rR = 0;
-
-    // left_extension
-    sdsl::int_vector<> samples_first;
-    sdsl::int_vector<> samples_last;
     
     // Phi (SA[i] -> SA[i-1])
     sparse_bitvector_t first;
@@ -1981,22 +1250,11 @@ private:
     sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
 
-    // PhiR
-    sparse_bitvector_t firstR;
-    sdsl::int_vector<> first_to_runR;
-
-    // PhiIR
-    sparse_bitvector_t lastR;
-    sdsl::int_vector<> last_to_runR;
-
     // determining the end of locate & left_contraction
     permuted_lcp<> plcp;
 
-    // right_contraction
-    permuted_lcp<> plcpR;
-
 };
 
 };
 
-#endif /* INCLUDED_BR_INDEX_HPP */
+#endif /* INCLUDED_BR_INDEX_LIMITED_HPP */

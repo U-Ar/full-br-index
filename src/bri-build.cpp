@@ -3,6 +3,7 @@
 #include <string>
 
 #include "br_index.hpp"
+#include "br_index_limited.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -11,11 +12,14 @@ using namespace bri;
 string out_basename = string();
 string input_file = string();
 bool sais = true;
+bool limited = false;
 
 void help(){
 	cout << "bri-build: builds the full bidirectional r-index. Extension .bri is automatically added to output index file" << endl << endl;
 	cout << "Usage: bri-build [options] <input_file_name>" << endl;
-	cout << "   -o <basename>        use 'basename' as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
+	cout << "   -o <basename>        use <basename> as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
+    cout << "   -limited             build limited version of br-index optimized for finding MEMs." << endl;
+    cout << "                        space-efficient, but left-extension and right-contraction are not supported." << endl;
 	cout << "   -divsufsort          use divsufsort algorithm to build the BWT (fast, 7.5n Bytes of RAM). By default,"<<endl;
 	cout << "                        SE-SAIS is used (about 4 time slower than divsufsort, 4n Bytes of RAM)."<<endl;
     cout << "   <input_file_name>    input text file." << endl;
@@ -47,6 +51,10 @@ void parse_args(char** argv, int argc, int &ptr){
 		sais = false;
 
 	}
+    else if (s.compare("-limited") == 0)
+    {
+        limited = true;
+    }
     else
     {
 		cout << "Error: unrecognized '" << s << "' option." << endl;
@@ -79,10 +87,14 @@ int main(int argc, char** argv)
     
     string idx_file = out_basename;
 
-    idx_file.append(".bri");
-
     cout << "Building br-index of input file " << input_file << endl;
-    cout << "Index will be saved to " << idx_file << endl;
+    if (!limited)
+    {
+        cout << "Index will be saved to " << idx_file << ".bri" << endl;
+    }
+    else {
+        cout << "Index will be saved to " << idx_file << ".bril" << endl;
+    }
 
     string input;
 
@@ -94,11 +106,18 @@ int main(int argc, char** argv)
         input = buffer.str();
     }
 
-    std::ofstream out(idx_file);
 
-    br_index<> idx(input,sais);
-    idx.serialize(out);
-
+    if (!limited)
+    {
+        br_index<> idx(input,sais);
+        idx.save_to_file(idx_file);
+    }
+    else 
+    {
+        br_index_limited<> idx(input,sais);
+        idx.save_to_file(idx_file);
+    }
+    
     auto t2 = high_resolution_clock::now();
 
     ulint total = duration_cast<duration<double, std::ratio<1>>>(t2-t1).count();

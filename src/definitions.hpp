@@ -43,6 +43,59 @@ struct range_hash
 
 };
 
+// sample maintained during the search
+struct br_sample {
+    /*
+     * state variables for left_extension & right_extension
+     * range: SA range of P
+     * j: SA[p]
+     * d: offset between starting position of the pattern & j
+     * rangeR: correspondents to range in reversed text
+     * len: current pattern length
+     */
+    range_t range, rangeR;
+    ulint j, d, len;
+    
+    br_sample(): range(), rangeR() {}
+
+    br_sample(range_t range_, 
+              range_t rangeR_,
+              ulint j_,
+              ulint d_,
+              ulint len_) 
+              :
+              range(range_),
+              rangeR(rangeR_),
+              j(j_),
+              d(d_),
+              len(len_) {}
+
+    void set_values(range_t range_, 
+                    range_t rangeR_,
+                    ulint j_,
+                    ulint d_,
+                    ulint len_)
+    {
+        range = range_;
+        rangeR = rangeR_;
+        j = j_;
+        d = d_;
+        len = len_;
+    }
+
+    // the pattern does not exist
+    bool is_invalid()
+    {
+        return (range.first > range.second) || (rangeR.first > rangeR.second);
+    }
+
+    // range size
+    ulint size()
+    {
+        return range.second + 1 - range.first;
+    }
+};
+
 };
 
 #endif /* INCLUDED_DEFINITIONS_HPP */
