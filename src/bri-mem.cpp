@@ -19,7 +19,7 @@ void help()
 
 	cout << "Usage: bri-mem [options] <index> <patterns>" << endl;
     cout << "   -limited     use the limited version of br-index." << endl;
-	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
+	cout << "   -c <text>    check correctness of each pattern occurrence on this text file" << endl;
     cout << "   -once        use a text file as one pattern instead of pattern file" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format or simple text file(if -once) containing the patterns." << endl;

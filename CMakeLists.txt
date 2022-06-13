@@ -44,6 +44,11 @@ TARGET_LINK_LIBRARIES(bri-space sdsl)
 TARGET_LINK_LIBRARIES(bri-space divsufsort)
 TARGET_LINK_LIBRARIES(bri-space divsufsort64)
 
+ADD_EXECUTABLE(fixedtest src/fixedtest.cpp)
+TARGET_LINK_LIBRARIES(fixedtest sdsl)
+TARGET_LINK_LIBRARIES(fixedtest divsufsort)
+TARGET_LINK_LIBRARIES(fixedtest divsufsort64)
+
 
 enable_testing()
 
