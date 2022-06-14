@@ -49,6 +49,16 @@ TARGET_LINK_LIBRARIES(fixedtest sdsl)
 TARGET_LINK_LIBRARIES(fixedtest divsufsort)
 TARGET_LINK_LIBRARIES(fixedtest divsufsort64)
 
+ADD_EXECUTABLE(k_vs_time src/k_vs_time.cpp)
+TARGET_LINK_LIBRARIES(k_vs_time sdsl)
+TARGET_LINK_LIBRARIES(k_vs_time divsufsort)
+TARGET_LINK_LIBRARIES(k_vs_time divsufsort64)
+
+ADD_EXECUTABLE(k_vs_space src/k_vs_space.cpp)
+TARGET_LINK_LIBRARIES(k_vs_space sdsl)
+TARGET_LINK_LIBRARIES(k_vs_space divsufsort)
+TARGET_LINK_LIBRARIES(k_vs_space divsufsort64)
+
 
 enable_testing()
 

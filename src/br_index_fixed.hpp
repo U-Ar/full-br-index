@@ -1,5 +1,5 @@
 /*
- * bi-directional r-index with fixed pattern length
+ * bi-directional r-index with acceleration to short patterns
  */
 
 /*
@@ -41,7 +41,7 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index_fixed(std::string const& input, ulint length, bool sais = true)
+    br_index_fixed(std::string const& input, ulint length=8, bool sais = true)
     {
         assert(length > 0);
         this->length = length;
@@ -57,6 +57,8 @@ public:
         }
 
         std::cout << "Text length = " << input.size() << std::endl << std::endl;
+
+        std::cout << "Border pattern length = " << length << std::endl;
 
         std::cout << "(1/4) Remapping alphabet ... " << std::flush;
         
@@ -152,7 +154,8 @@ public:
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
 
-        // plcpR is not needed for fixed length index
+        // plcpR is needed for full index
+        plcpR = permuted_lcp<>(ccR);
 
         // remove cache of textR and SAR
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, ccR));
@@ -253,6 +256,11 @@ public:
         // sort samples of last positions in runs according to text position
         std::sort(samples_last_vec.begin(), samples_last_vec.end());
 
+        // sort samples of first positions in runs according to text position
+        std::sort(samples_first_vecR.begin(), samples_first_vecR.end());
+        // sort samples of last positions in runs according to text position
+        std::sort(samples_last_vecR.begin(), samples_last_vecR.end());
+
         // build Elias-Fano predecessor
         {
             std::vector<bool> first_bv(bwt_s.size(),false);
@@ -294,10 +302,53 @@ public:
 
 
 
-        // construct kmer_start, kmer_end
+        // build Elias-Fano predecessor for reversed direction
         {
-            sdsl::int_vector<> lcp;
-            sdsl::load_from_file(lcp, sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
+            std::vector<bool> first_bvR(bwt_sR.size(),false);
+            for (auto p: samples_first_vecR)
+            {
+                assert(p.first < first_bvR.size());
+                first_bvR[p.first] = true;
+            }
+            firstR = sparse_bitvector_t(first_bvR);
+        }
+        {
+            std::vector<bool> last_bvR(bwt_sR.size(),false);
+            for (auto p: samples_last_vecR)
+            {
+                assert(p.first < last_bvR.size());
+                last_bvR[p.first] = true;
+            }
+            lastR = sparse_bitvector_t(last_bvR);
+        }
+
+        assert(firstR.rank(firstR.size()) == rR);
+        assert(lastR.rank(lastR.size()) == rR);
+
+        first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+
+        last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+
+        // construct first_to_runR
+        for (ulint i = 0; i < samples_first_vecR.size(); ++i)
+        {
+            first_to_runR[i] = samples_first_vecR[i].second;
+        }
+
+        // construct last_to_runR
+        for (ulint i = 0; i < samples_last_vecR.size(); ++i)
+        {
+            last_to_runR[i] = samples_last_vecR[i].second;
+        }
+
+
+
+        // construct kmer_start, kmer_end
+        kmer_start = {};
+        kmer_end = {};
+        sdsl::int_vector<> lcp;
+        sdsl::load_from_file(lcp, sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
+        for (ulint k = 0; k < length; ++k) {
             std::vector<bool> kmer_start_vector(text.size(),false);
             std::vector<bool> kmer_end_vector(text.size(),false);
             kmer_start_vector[0] = true;
@@ -314,7 +365,7 @@ public:
                     yet = true;
                     tmp = bwt_s[i-1];
                 }
-                if (yet && lcp[i] < length-1)
+                if (yet && lcp[i] < k)
                 {
                     yet = false;
                     kmer_start_vector[i] = true;
@@ -328,21 +379,23 @@ public:
                     yet = true;
                     tmp = bwt_s[i+1];
                 }
-                if (yet && lcp[i+1] < length-1)
+                if (yet && lcp[i+1] < k)
                 {
                     yet = false;
                     kmer_end_vector[i] = true;
                 }
             }
 
-            kmer_start = sparse_bitvector_t(kmer_start_vector);
-            kmer_end = sparse_bitvector_t(kmer_end_vector);
+            kmer_start.push_back(sparse_bitvector_t(kmer_start_vector));
+            kmer_end.push_back(sparse_bitvector_t(kmer_end_vector));
         }
 
         // construct kmer_startR, kmer_endR
-        {
-            sdsl::int_vector<> lcpR;
-            sdsl::load_from_file(lcpR, sdsl::cache_file_name(sdsl::conf::KEY_LCP, ccR));
+        kmer_startR = {};
+        kmer_endR = {};
+        sdsl::int_vector<> lcpR;
+        sdsl::load_from_file(lcpR, sdsl::cache_file_name(sdsl::conf::KEY_LCP, ccR));
+        for (ulint k = 0; k < length; ++k) {
             std::vector<bool> kmer_start_vectorR(textR.size(),false);
             std::vector<bool> kmer_end_vectorR(textR.size(),false);
             kmer_start_vectorR[0] = true;
@@ -359,7 +412,7 @@ public:
                     yet = true;
                     tmp = bwt_sR[i-1];
                 }
-                if (yet && lcpR[i] < length-1)
+                if (yet && lcpR[i] < k)
                 {
                     yet = false;
                     kmer_start_vectorR[i] = true;
@@ -373,15 +426,15 @@ public:
                     yet = true;
                     tmp = bwt_sR[i+1];
                 }
-                if (yet && lcpR[i+1] < length-1)
+                if (yet && lcpR[i+1] < k)
                 {
                     yet = false;
                     kmer_end_vectorR[i] = true;
                 }
             }
 
-            kmer_startR = sparse_bitvector_t(kmer_start_vectorR);
-            kmer_endR = sparse_bitvector_t(kmer_end_vectorR);
+            kmer_startR.push_back(sparse_bitvector_t(kmer_start_vectorR));
+            kmer_endR.push_back(sparse_bitvector_t(kmer_end_vectorR));
         }
 
 
@@ -497,6 +550,59 @@ public:
         ulint prev_sample = samples_first[last_to_run[jr]+1];
 
         return (prev_sample + delta) % bwt.size();
+    }
+
+    /*
+     * PhiR function
+     * get SAR[i] from SAR[i+1]
+     */
+    ulint PhiR(ulint i)
+    {
+        assert(i != bwtR.size() - 1);
+
+        ulint jr = firstR.predecessor_rank_circular(i);
+
+        assert(jr <= rR - 1);
+
+        ulint k = firstR.select(jr);
+
+        assert(jr < rR - 1 || k == bwtR.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(first_to_runR[jr] > 0);
+
+        ulint prev_sample = samples_lastR[first_to_runR[jr]-1];
+
+        return (prev_sample + delta) % bwtR.size();
+    }
+    /*
+     * PhiR inverse
+     * get SAR[i] from SAR[i-1]
+     */
+    ulint PhiIR(ulint i)
+    {
+        //assert(i != last_SA_val);
+
+        ulint jr = lastR.predecessor_rank_circular(i);
+
+        assert(jr <= rR - 1);
+
+        ulint k = lastR.select(jr);
+
+        assert(jr < rR - 1 || k == bwtR.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(last_to_runR[jr] < rR-1);
+
+        ulint prev_sample = samples_firstR[last_to_runR[jr]+1];
+
+        return (prev_sample + delta) % bwtR.size();
     }
 
     ulint LF(ulint i)
@@ -726,12 +832,11 @@ public:
     /*
      * match the pattern P from the current pattern cP
      * return SAR&SA range corresponding to P
-     * <CAUTION> correct only when |cP| = length
      */
     br_sample left_contraction(br_sample const& prev_sample)
     {
         br_sample sample(prev_sample);
-        assert(sample.len == length);
+        assert(sample.len >= 1);
 
         // get Psi(s), Psi(e)
         ulint psi_s = FL(sample.range.first);
@@ -745,16 +850,43 @@ public:
         ulint run_start = bwt.run_start(run_psi_s);
         ulint run_psi_e = bwt.run_of_position(psi_e);
         ulint run_end = bwt.run_end(run_psi_e);
-
         assert(run_start <= psi_s);
-        // predecessor in [0,psi_s]
-        if (run_start == psi_s) sample.range.first = kmer_start.select(kmer_start.rank(psi_s+1) - 1);
-        else sample.range.first = psi_s;
-        
         assert(psi_e <= run_end);
-        // successor in [psi_e,n-1]
-        if (run_end == psi_e) sample.range.second = kmer_end.select(kmer_end.rank(psi_e));
-        else sample.range.second = psi_e;
+
+        if (sample.len <= length)
+        {
+            // predecessor in [0,psi_s]
+            if (run_start == psi_s) sample.range.first = kmer_start[sample.len-1].select(kmer_start[sample.len-1].rank(psi_s+1) - 1);
+            else sample.range.first = psi_s;
+            
+            // successor in [psi_e,n-1]
+            if (run_end == psi_e) sample.range.second = kmer_end[sample.len-1].select(kmer_end[sample.len-1].rank(psi_e));
+            else sample.range.second = psi_e;
+        }
+        else 
+        {
+            sample.range.first = psi_s;
+            if (run_start == psi_s) {
+                ulint pos = (samples_first[run_psi_s]+1) % bwt.size();
+
+                while (sample.range.first > 0 && plcp[pos] >= sample.len-1)
+                {
+                    sample.range.first--;
+                    pos = Phi(pos);
+                }
+            }
+            sample.range.second = psi_e;
+            if (run_end == psi_e) {
+                ulint pos = (samples_last[run_psi_e]+1) % bwt.size();
+
+                while (sample.range.second < bwt.size()-1)
+                {
+                    pos = PhiI(pos);
+                    if (plcp[pos] < sample.len-1) break;
+                    sample.range.second++;
+                }
+            }
+        }
         
         // accumulated occ of aP (for any a s.t. a < c)
         ulint acc = 0;
@@ -779,12 +911,11 @@ public:
     /*
      * match the pattern P from the current pattern Pc
      * return SAR&SA range corresponding to P
-     * <CAUTION> correct only when |Pc| = length
      */
     br_sample right_contraction(br_sample const& prev_sample)
     {
         br_sample sample(prev_sample);
-        assert(sample.len == length);
+        assert(sample.len >= 1);
 
         // get PsiR(sR), Psi(eR)
         ulint psiR_sR = FLR(sample.rangeR.first);
@@ -797,17 +928,43 @@ public:
         ulint run_start = bwtR.run_start(run_psiR_sR);
         ulint run_psiR_eR = bwtR.run_of_position(psiR_eR);
         ulint run_end = bwtR.run_end(run_psiR_eR);
-
-
         assert(run_start <= psiR_sR);
-        // predecessor in [0,psiR_sR]
-        if (run_start == psiR_sR) sample.rangeR.first = kmer_startR.select(kmer_startR.rank(psiR_sR+1) - 1);
-        else sample.rangeR.first = psiR_sR;
-        
         assert(psiR_eR <= run_end);
-        // successor in [psiR_eR,n-1]
-        if (run_end == psiR_eR) sample.rangeR.second = kmer_endR.select(kmer_endR.rank(psiR_eR));
-        else sample.rangeR.second = psiR_eR;
+
+        if (sample.len <= length)
+        {
+            // predecessor in [0,psiR_sR]
+            if (run_start == psiR_sR) sample.rangeR.first = kmer_startR[sample.len-1].select(kmer_startR[sample.len-1].rank(psiR_sR+1) - 1);
+            else sample.rangeR.first = psiR_sR;
+            
+            // successor in [psiR_eR,n-1]
+            if (run_end == psiR_eR) sample.rangeR.second = kmer_endR[sample.len-1].select(kmer_endR[sample.len-1].rank(psiR_eR));
+            else sample.rangeR.second = psiR_eR;
+        }
+        else
+        {
+            sample.rangeR.first = psiR_sR;
+            if (run_start == psiR_sR) {
+                ulint pos = (samples_firstR[run_psiR_sR]+1) % bwtR.size();
+
+                while (sample.rangeR.first > 0 && plcpR[pos] >= sample.len-1)
+                {
+                    sample.rangeR.first--;
+                    pos = PhiR(pos);
+                }
+            }
+            sample.rangeR.second = psiR_eR;
+            if (run_end == psiR_eR) {
+                ulint pos = (samples_lastR[run_psiR_eR]+1) % bwtR.size();
+
+                while (sample.rangeR.second < bwtR.size()-1)
+                {
+                    pos = PhiIR(pos);
+                    if (plcpR[pos] < sample.len-1) break;
+                    sample.rangeR.second++;
+                }
+            }
+        }
 
 
         // accumulated occ of Pa (for any a s.t. a < c)
@@ -885,7 +1042,7 @@ public:
         assert(!sample.is_invalid());
         std::string res;
         ulint p = sample.range.first;
-        for (ulint i = 0; i < length; ++i)
+        for (ulint i = 0; i < sample.len; ++i)
         {
             p = FL(p);
             res.push_back(remap_inv[(uchar)bwt[p]]);
@@ -1093,13 +1250,23 @@ public:
         w_bytes += samples_firstR.serialize(out);
         w_bytes += samples_lastR.serialize(out);
 
-        w_bytes += kmer_start.serialize(out);
-        w_bytes += kmer_end.serialize(out);
+        w_bytes += firstR.serialize(out);
+        w_bytes += first_to_runR.serialize(out);
 
-        w_bytes += kmer_startR.serialize(out);
-        w_bytes += kmer_endR.serialize(out);
+        w_bytes += lastR.serialize(out);
+        w_bytes += last_to_runR.serialize(out);
+
+        for (ulint k = 0; k < length; ++k)
+        {
+            w_bytes += kmer_start[k].serialize(out);
+            w_bytes += kmer_end[k].serialize(out);
+
+            w_bytes += kmer_startR[k].serialize(out);
+            w_bytes += kmer_endR[k].serialize(out);
+        }
 
         w_bytes += plcp.serialize(out);
+        w_bytes += plcpR.serialize(out);
 
         return w_bytes;
     
@@ -1140,13 +1307,27 @@ public:
         samples_firstR.load(in);
         samples_lastR.load(in);
 
-        kmer_start.load(in);
-        kmer_end.load(in);
+        firstR.load(in);
+        first_to_runR.load(in);
 
-        kmer_startR.load(in);
-        kmer_endR.load(in);
+        lastR.load(in);
+        last_to_runR.load(in);
+
+        kmer_start.resize(length);
+        kmer_end.resize(length);
+        kmer_startR.resize(length);
+        kmer_endR.resize(length);
+        for (ulint k = 0; k < length; ++k)
+        {
+            kmer_start[k].load(in);
+            kmer_end[k].load(in);
+
+            kmer_startR[k].load(in);
+            kmer_endR[k].load(in);
+        }
 
         plcp.load(in);
+        plcpR.load(in);
 
     }
 
@@ -1180,14 +1361,21 @@ public:
 
     ulint bwt_size(bool reversed=false) { return bwt.size(); }
 
+    ulint border_length() { return length; }
+
     uchar get_terminator() {
         return TERMINATOR;
+    }
+
+    ulint print_space()
+    {
+        return print_space(length);
     }
 
     /*
      * get statistics
      */
-    ulint print_space() 
+    ulint print_space(ulint fix)
     {
 
         std::cout << "text length           : " << bwt.size() << std::endl;
@@ -1211,6 +1399,7 @@ public:
         std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
 
         tot_bytes += plcp.print_space();
+        tot_bytes += plcpR.print_space();
 
         std::ofstream out("/dev/null");
 
@@ -1253,22 +1442,45 @@ public:
         std::cout << "samples_lastR: " << bytes << " bytes" << std::endl;
 
 
-        bytes =  kmer_start.serialize(out);
+        bytes =  firstR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "kmer_start: " << bytes << " bytes" << std::endl;
+        std::cout << "firstR: " << bytes << " bytes" << std::endl;
 
-        bytes =  kmer_end.serialize(out);
+        bytes =  first_to_runR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "kmer_end: " << bytes << " bytes" << std::endl;
+        std::cout << "first_to_runR: " << bytes << " bytes" << std::endl;
 
 
-        bytes =  kmer_startR.serialize(out);
+        bytes =  lastR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "kmer_startR: " << bytes << " bytes" << std::endl;
+        std::cout << "lastR: " << bytes << " bytes" << std::endl;
 
-        bytes =  kmer_endR.serialize(out);
+        bytes =  last_to_runR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "kmer_endR: " << bytes << " bytes" << std::endl;
+        std::cout << "last_to_runR: " << bytes << " bytes" << std::endl;
+
+
+        std::cout << "kmer_start, kmer_end, kmer_startR, kmer_endR: ";
+        ulint kmer_bytes = 0;
+        for (ulint k = 0; k < fix; ++k)
+        {
+            bytes =  kmer_start[k].serialize(out);
+            kmer_bytes += bytes;
+            tot_bytes += bytes;
+
+            bytes =  kmer_end[k].serialize(out);
+            kmer_bytes += bytes;
+            tot_bytes += bytes;
+
+            bytes =  kmer_startR[k].serialize(out);
+            kmer_bytes += bytes;
+            tot_bytes += bytes;
+
+            bytes =  kmer_endR[k].serialize(out);
+            kmer_bytes += bytes;
+            tot_bytes += bytes;
+        }
+        std::cout << kmer_bytes << " bytes" << std::endl;
 
 
         std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
@@ -1297,6 +1509,7 @@ public:
         tot_bytes += bwtR.get_space();
 
         tot_bytes += plcp.get_space();
+        tot_bytes += plcpR.get_space();
 
         std::ofstream out("/dev/null");
 
@@ -1312,11 +1525,21 @@ public:
         tot_bytes += samples_firstR.serialize(out);
         tot_bytes += samples_lastR.serialize(out);
 
-        tot_bytes += kmer_start.serialize(out);
-        tot_bytes += kmer_end.serialize(out);
+        tot_bytes += firstR.serialize(out);
+        tot_bytes += first_to_runR.serialize(out);
 
-        tot_bytes += kmer_startR.serialize(out);
-        tot_bytes += kmer_endR.serialize(out);
+        tot_bytes += lastR.serialize(out);
+        tot_bytes += last_to_runR.serialize(out);
+
+
+        for (ulint k = 0; k < length; ++k)
+        {
+            tot_bytes += kmer_start[k].serialize(out);
+            tot_bytes += kmer_end[k].serialize(out);
+
+            tot_bytes += kmer_startR[k].serialize(out);
+            tot_bytes += kmer_endR[k].serialize(out);
+        }
 
         return tot_bytes;
 
@@ -1441,19 +1664,30 @@ private:
     sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
 
+    // PhiR
+    sparse_bitvector_t firstR;
+    sdsl::int_vector<> first_to_runR;
+
+    // PhiIR
+    sparse_bitvector_t lastR;
+    sdsl::int_vector<> last_to_runR;
+
     // determining the end of locate & left_contraction
     permuted_lcp<> plcp;
+
+    // right_contraction
+    permuted_lcp<> plcpR;
 
     // fixed length
     ulint length;
 
     // left_contraction limited to fixed length
-    sparse_bitvector_t kmer_start;
-    sparse_bitvector_t kmer_end;
+    std::vector<sparse_bitvector_t> kmer_start;
+    std::vector<sparse_bitvector_t> kmer_end;
 
     // right_contraction limited to fixed length
-    sparse_bitvector_t kmer_startR;
-    sparse_bitvector_t kmer_endR;
+    std::vector<sparse_bitvector_t> kmer_startR;
+    std::vector<sparse_bitvector_t> kmer_endR;
 
 };
 

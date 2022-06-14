@@ -110,7 +110,7 @@ int main(int argc, char** argv)
 
     if (length > 0)
     {
-        cout << "Building fixed length br-index on input file " << input_file << endl;
+        cout << "Building fixed length " << length << " br-index on input file " << input_file << endl;
         cout << "Index will be saved to " << idx_file << ".brif" << endl;
     }
     else if (limited)

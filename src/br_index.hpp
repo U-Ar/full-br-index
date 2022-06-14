@@ -318,13 +318,13 @@ public:
 
         last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
 
-        // construct first_to_run
+        // construct first_to_runR
         for (ulint i = 0; i < samples_first_vecR.size(); ++i)
         {
             first_to_runR[i] = samples_first_vecR[i].second;
         }
 
-        // construct last_to_run
+        // construct last_to_runR
         for (ulint i = 0; i < samples_last_vecR.size(); ++i)
         {
             last_to_runR[i] = samples_last_vecR[i].second;
