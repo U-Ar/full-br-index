@@ -3,6 +3,7 @@
 #include "br_index.hpp"
 #include "br_index_limited.hpp"
 #include "br_index_fixed.hpp"
+#include "br_index_st.hpp"
 
 using namespace std;
 using namespace bri;
@@ -76,9 +77,9 @@ int main(int argc, char** argv){
 	}
 	else 
 	{
-		br_index<> idx;
+		br_index_st<> idx;
 
-		cout << "Loading full-br-index from " << argv[ptr] << endl;
+		cout << "Loading br-index-suffix-tree from " << argv[ptr] << endl;
 		idx.load_from_file(argv[ptr]);
 		cout << "--- Statistics of the text and the breakdown of the br-index space usage ---" << endl;
 		

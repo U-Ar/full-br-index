@@ -4,6 +4,7 @@
 
 #include "br_index.hpp"
 #include "br_index_limited.hpp"
+#include "br_index_st.hpp"
 #include "utils.hpp"
 
 using namespace bri;
@@ -15,7 +16,8 @@ bool once = false;
 
 void help()
 {
-	cout << "bri-mem: locate maximal exact matches of the input patterns." << endl;
+	cout << "bri-mem: locate maximal exact matches of the input patterns. " << endl;
+    cout << "         by default br_index_st is used." << endl;
 
 	cout << "Usage: bri-mem [options] <index> <patterns>" << endl;
     cout << "   -limited     use the limited version of br-index." << endl;
@@ -276,7 +278,7 @@ int main(int argc, char** argv)
     }
     else 
     {
-        locate_all<br_index<> >(in, patt_file);
+        locate_all<br_index_st<> >(in, patt_file);
     }
     
 

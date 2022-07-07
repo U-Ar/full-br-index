@@ -1395,7 +1395,7 @@ public:
     }
 
     /*
-     * save index to "{path_prefix}.brif" file
+     * save index to "{path_prefix}.brst" file
      */
     void save_to_file(std::string const& path_prefix)
     {

@@ -5,6 +5,7 @@
 #include "br_index.hpp"
 #include "br_index_limited.hpp"
 #include "br_index_fixed.hpp"
+#include "br_index_st.hpp"
 #include "utils.hpp"
 
 using namespace std;
@@ -110,8 +111,8 @@ int main(int argc, char** argv)
 
     if (length > 0)
     {
-        cout << "Building fixed length " << length << " br-index on input file " << input_file << endl;
-        cout << "Index will be saved to " << idx_file << ".brif" << endl;
+        cout << "Building suffix tree like index " << length << " br-index on input file " << input_file << endl;
+        cout << "Index will be saved to " << idx_file << ".brst" << endl;
     }
     else if (limited)
     {
@@ -146,7 +147,7 @@ int main(int argc, char** argv)
     }
     else 
     {
-        br_index<> idx(input,sais);
+        br_index_st<> idx(input,(unsigned long)length,sais);
         idx.save_to_file(idx_file);
     }
     
