@@ -84,13 +84,18 @@ struct br_sample {
     }
 
     // the pattern does not exist
-    bool is_invalid()
+    bool is_invalid() const
     {
         return (range.first > range.second) || (rangeR.first > rangeR.second);
     }
 
+    bool contains(br_sample const& other) const
+    {
+        return range.first <= other.range.first && other.range.second <= range.second
+    }
+
     // range size
-    ulint size()
+    ulint size() const
     {
         return range.second + 1 - range.first;
     }

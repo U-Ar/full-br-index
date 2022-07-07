@@ -1,13 +1,11 @@
 /*
- * bi-directional r-index with acceleration to short patterns
+ * bi-directional r-index
+ *   supporting suffix tree operations
  */
 
-/*
- * Experimental, very very many components
- */
 
-#ifndef INCLUDED_BR_INDEX_FIXED_HPP
-#define INCLUDED_BR_INDEX_FIXED_HPP
+#ifndef INCLUDED_BR_INDEX_ST_HPP
+#define INCLUDED_BR_INDEX_ST_HPP
 
 #include "definitions.hpp"
 #include "rle_string.hpp"
@@ -21,13 +19,13 @@ template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
 >
-class br_index_fixed {
+class br_index_st {
 
 public:
 
     using triple = std::tuple<range_t, ulint, ulint>;
 
-    br_index_fixed() {}
+    br_index_st() {}
 
     /*
      * constructor. 
@@ -35,7 +33,7 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index_fixed(std::string const& input, ulint length=8, bool sais = true)
+    br_index_st(std::string const& input, ulint length=8, bool sais = true)
     {
         assert(length > 0);
         this->length = length;
@@ -429,20 +427,6 @@ public:
 
             kmer_startR.push_back(sparse_bitvector_t(kmer_start_vectorR));
             kmer_endR.push_back(sparse_bitvector_t(kmer_end_vectorR));
-        }
-
-        // construct kmer_start_all, kmer_end_all
-        kmer_start_all = {};
-        for (ulint k = 0; k < length; ++k)
-        {
-            std::vector<bool> kmer_start_vector(text.size()+1,false);
-            kmer_start_vector[0] = true;
-            kmer_start_vector[text.size()] = true;
-            for (ulint i = 1; i < text.size(); ++i)
-            {
-                if (lcp[i] < k) kmer_start_vector[i] = true;
-            }
-            kmer_start_all.push_back(sparse_bitvector_t(kmer_start_vector));
         }
 
         // release LCP cache
@@ -994,148 +978,129 @@ public:
         return sample;
     }
 
-    // left-extension for uni version
-    br_sample left_extension_uni(uchar c, br_sample const& prev_sample)
+    // suffix tree op: root
+    br_sample root() { return get_initial_sample(); }
+
+    // suffix tree op: parent
+    br_sample parent(br_sample const& sample)
     {
-        // replace c with internal representation
-        c = remap[c];
-
-        br_sample sample(prev_sample);
-
-        // get SA range of cP
-        sample.range = LF(prev_sample.range,c);
-
-        // pattern cP was not found
-        if (sample.is_invalid()) return sample;
-
-        // cP and aP occurs for some a s.t. a != c
-        if (prev_sample.range.second - prev_sample.range.first != 
-            sample.range.second      - sample.range.first)
+        br_sample new_sample(sample);
+        br_sample tmp(right_contraction(sample));
+        while (tmp.size() == new_sample.size())
         {
-            // fint last c in range and get its sample
-            // there must be at least one c due to the previous if clause
-            ulint rnk = bwt.rank(prev_sample.range.second+1,c);
-            assert(rnk > 0);
-
-            // update p by corresponding BWT position
-            ulint p = bwt.select(rnk-1,c);
-            assert(p >= prev_sample.range.first && p <= prev_sample.range.second);
-
-            // run number of position p
-            ulint run_of_p = bwt.run_of_position(p);
-
-            // update j by SA[p]
-            if (bwt[prev_sample.range.second] == c)
-                sample.j = samples_first[run_of_p];
-            else
-                sample.j = samples_last[run_of_p];
-
-            // reset d
-            sample.d = 0;
-
+            new_sample = tmp;
+            tmp = right_contraction(new_sample);
         }
-        else // only c precedes P 
-        {
-            // increment offset by 1
-            sample.d++;
-        }
-        sample.len++;
-        return sample;
+        return tmp;
     }
 
-    /*
-     * right_contraction for uni version
-     */
-    br_sample right_contraction_uni(br_sample const& prev_sample)
+    // suffix tree op: child
+    br_sample child(uchar c, br_sample const& sample)
     {
-        br_sample sample(prev_sample);
-        assert(sample.len >= 1);
-
-        if (sample.len <= length)
+        br_sample new_sample(right_extension(c,sample));
+        uchar a = bwt_R[new_sample.rangeR.first]
+        range_t range = LFR(new_sample.rangeR,a);
+        while (range.second + 1 - range.first == new_sample.rangeR.second + 1 - new_sample.rangeR.first)
         {
-            ulint ones = kmer_start_all[sample.len-1].rank(sample.range.first+1);
-            sample.range.first  = kmer_start_all[sample.len-1].select(ones - 1);
-            sample.range.second = kmer_start_all[sample.len-1].select(ones) - 1;
-            assert(sample.range.first <= prev_sample.range.first);
-            assert(sample.range.second >= prev_sample.range.second);
+            new_sample.rangeR = range;
+            range = LFR(range, bwt_R[range.first]);
+        }
+        return new_sample;
+    }
+
+    // suffix tree op: suffix-link
+    br_sample slink(br_sample const& sample)
+    {
+        return left_contraction(sample);
+    }
+
+    // suffix tree op: weiner-link
+    br_sample wlink(uchar c, br_sample const& sample)
+    {
+        return left_extension(c,sample);
+    }
+
+    // suffix tree op: lowest common ancestor
+    br_sample lca(br_sample const& left, br_sample const& right)
+    {
+        if (left.len <= right.len) 
+        {
+            br_sample anc(left);
+            while (!anc.contains(right)) anc = parent(anc);
+            return anc;
         }
         else 
         {
-            ulint pos = sample.j - sample.d;
-            while (plcp[pos] >= sample.len-1)
-            {
-                pos = Phi(pos);
-                sample.range.first--;
-            }
-            pos = sample.j - sample.d;
-            while (true)
-            {
-                if (pos == last_SA_val) break;
-                pos = PhiI(pos);
-                if (plcp[pos] < sample.len-1) break;
-                sample.range.second++;
-            }
+            br_sample anc(right);
+            while (!anc.contains(left)) anc = parent(anc);
+            return anc;
         }
-
-        // updating j, d, len (very simple for contraction)
-        if (sample.d == sample.len - 1) 
-        {
-            sample.j--; sample.d--;
-        }
-        sample.len--;
-
-        return sample;
     }
 
-    // outdegree of the current node in the de Bruijn graph
-    ulint outdegree(br_sample const& sample)
-    {
-        assert(sample.len <= length);
-        br_sample tmp(sample);
-        if (tmp.len == length) tmp = left_contraction(tmp);
+    // suffix tree op: ancestor(v,w)
+    bool ancestor(br_sample const& v, br_sample const& w) { return v.contains(w); }
 
-        ulint res = 0;
-        for (uchar c = 1; c <= sigma; ++c)
+    // suffix tree op: string-depth(v)
+    ulint sdepth(br_sample const& sample) { return sample.len; }
+
+    /*
+    // suffix tree op: first-child(v)
+    br_sample fchild(br_sample const& sample)
+    {
+        
+    }
+
+    // suffix tree op: next-sibling(v)
+    br_sample nsibling(br_sample const& sample)
+    {
+
+    }
+    */
+
+    // suffix tree op: children(v)
+    std::vector<br_sample> children(br_sample const& sample)
+    {
+        std::vector<br_sample> res;
+        for (ulint a = 1; a < c; ++a)
         {
-            range_t range = LFR(c,tmp.rangeR);
-            if (range.second + 1 - range.first > 0) res++;
+            br_sample tmp(child(remap_inv[a],sample));
+            res.push_back(tmp);
         }
         return res;
     }
 
-    // indegree of the current node in the de Bruijn graph
-    ulint indegree(br_sample const& sample)
+    // suffix tree op: letter(v,i)
+    uchar letter(br_sample const& sample, ulint i)
     {
-        assert(sample.len <= length);
-        br_sample tmp(sample);
-        if (tmp.len == length) tmp = right_contraction(tmp);
-
-        ulint res = 0;
-        for (uchar c = 1; c <= sigma; ++c)
+        assert(i < sample.len);
+        if (2 * i <= sample.len)
         {
-            range_t range = LF(c,tmp.range);
-            if (range.second + 1 - range.first > 0) res++;
+            ulint p = sample.range.first;
+            for (ulint j = 0; j <= i; ++j)
+            {
+                p = FL(p);
+            }
+            return remap_inv[bwt[p]];
         }
-        return res;
+        else 
+        {
+            ulint p = sample.rangeR.first;
+            for (ulint j = 0; j < len-i; ++j)
+            {
+                p = FLR(p);
+            }
+            return remap_inv[bwtR[p]];
+        }
     }
 
-    // traverse the outgoing edge with label c in the de Bruijn graph
-    br_sample outgoing(uchar c, br_sample const& prev_sample)
-    {
-        assert(prev_sample.len <= length);
-        if (prev_sample.len < length) return right_extension(c,prev_sample);
-        return right_extension(c,left_contraction(prev_sample));
-    }
+    // suffix tree ops not supported:
+    // - tree-depth
+    // - level-ancestor-string
+    // - level-ancestor-tree
+    // they can be naively computed by iteratively applying right-contraction
 
-    // traverse the incoming edge with label c in the de Bruijn graph
-    br_sample incoming(uchar c, br_sample const& prev_sample)
-    {
-        assert(prev_sample.len <= length);
-        if (prev_sample.len < length) return left_extension(c,prev_sample);
-        return left_extension(c,right_contraction(prev_sample));
-    }
 
-    // node label in the de Bruijn graph
+    // node label
     std::string label(br_sample const& sample)
     {
         std::string res;
@@ -1363,9 +1328,6 @@ public:
             w_bytes += kmer_endR[k].serialize(out);
         }
 
-        for (ulint k = 0; k < length; ++k)
-            w_bytes += kmer_start_all[k].serialize(out);
-
         w_bytes += plcp.serialize(out);
         w_bytes += plcpR.serialize(out);
 
@@ -1427,10 +1389,6 @@ public:
             kmer_endR[k].load(in);
         }
 
-        kmer_start_all.resize(length);
-        for (ulint k = 0; k < length; ++k)
-            kmer_start_all[k].load(in);
-
         plcp.load(in);
         plcpR.load(in);
 
@@ -1442,7 +1400,7 @@ public:
     void save_to_file(std::string const& path_prefix)
     {
 
-        std::string path = path_prefix + ".brif";
+        std::string path = path_prefix + ".brst";
         
         std::ofstream out(path);
         serialize(out);
@@ -1587,19 +1545,6 @@ public:
         }
         std::cout << kmer_bytes << " bytes" << std::endl;
 
-        /*
-        std::cout << "kmer_start_all: ";
-        kmer_bytes = 0;
-        for (ulint k = 0; k < fix; ++k)
-        {
-            bytes = kmer_start_all[k].serialize(out);
-            kmer_bytes += bytes;
-            tot_bytes += bytes;
-        }
-        std::cout << kmer_bytes << " bytes" << std::endl;
-        */
-
-
         std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
         std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl;
 
@@ -1607,83 +1552,6 @@ public:
 
     }
 
-
-    ulint print_space_uni(ulint fix)
-    {
-        std::cout << "(print_space_uni)" << std::endl;
-        std::cout << "text length           : " << bwt.size() << std::endl;
-        std::cout << "alphabet size         : " << sigma << std::endl;
-        std::cout << "number of runs in bwt : " << bwt.number_of_runs() << std::endl;
-        std::cout << "numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
-        
-        ulint tot_bytes = sizeof(sigma)
-                        + sizeof(length)
-                        + 256*sizeof(uchar)
-                        + 256*sizeof(uchar)
-                        + sizeof(terminator_position)
-                        + sizeof(terminator_positionR)
-                        + sizeof(last_SA_val)
-                        + 256*sizeof(ulint);
-        
-        std::cout << "fixed pattern length: " << length << std::endl;
-        
-        tot_bytes += bwt.print_space();
-        //tot_bytes += bwtR.print_space();
-        std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
-
-        tot_bytes += plcp.print_space();
-        //tot_bytes += plcpR.print_space();
-
-        std::ofstream out("/dev/null");
-
-        ulint bytes = 0;
-
-        
-        bytes =  samples_first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << " bytes" << std::endl;
-
-        bytes =  samples_last.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_last: " << bytes << " bytes" << std::endl;
-
-
-        bytes =  first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "first: " << bytes << " bytes" << std::endl;
-
-        bytes =  first_to_run.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "first_to_run: " << bytes << " bytes" << std::endl;
-
-
-        bytes =  last.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "last: " << bytes << " bytes" << std::endl;
-
-        bytes =  last_to_run.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "last_to_run: " << bytes << " bytes" << std::endl;
-
-
-
-        std::cout << "kmer_start_all: ";
-        ulint kmer_bytes = 0;
-        for (ulint k = 0; k < fix; ++k)
-        {
-            bytes = kmer_start_all[k].serialize(out);
-            kmer_bytes += bytes;
-            tot_bytes += bytes;
-        }
-        std::cout << kmer_bytes << " bytes" << std::endl;
-
-
-        std::cout << "<total space of br-index uni version>: " << tot_bytes << " bytes" << std::endl << std::endl;
-        std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl << std::endl;
-
-        return tot_bytes;
-
-    }
 
     /*
      * get space complexity
@@ -1884,12 +1752,8 @@ private:
     std::vector<sparse_bitvector_t> kmer_startR;
     std::vector<sparse_bitvector_t> kmer_endR;
 
-    // mono-directional right_contraction
-    std::vector<sparse_bitvector_t> kmer_start_all;
-
-
 };
 
 };
 
-#endif /* INCLUDED_BR_INDEX_FIXED_HPP */
+#endif /* INCLUDED_BR_INDEX_ST_HPP */
