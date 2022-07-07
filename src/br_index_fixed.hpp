@@ -1062,6 +1062,10 @@ public:
         else 
         {
             ulint pos = sample.j - sample.d;
+            while (plcp[pos] >= sample.len)
+            {
+                pos = Phi(pos);
+            }
             while (plcp[pos] >= sample.len-1)
             {
                 pos = Phi(pos);
@@ -1072,8 +1076,18 @@ public:
             {
                 if (pos == last_SA_val) break;
                 pos = PhiI(pos);
-                if (plcp[pos] < sample.len-1) break;
+                if (plcp[pos] < sample.len) break;
+            }
+            if (plcp[pos] == sample.len-1) 
+            {
                 sample.range.second++;
+                while (true)
+                {
+                    if (pos == last_SA_val) break;
+                    pos = PhiI(pos);
+                    if (plcp[pos] < sample.len-1) break;
+                    sample.range.second++;
+                }
             }
         }
 
