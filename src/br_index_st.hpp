@@ -679,7 +679,15 @@ public:
                         (samples_last[r-1]+1) % bwt.size(), // arbitrary sample
                         0,            // offset 0
                         0);           // null pattern
+    }
 
+    inline br_sample get_invalid_sample()
+    {
+            return br_sample({1,0}, // entire SA range
+                        {1,0}, // entire SAR range
+                        0, // arbitrary sample
+                        0,            // offset 0
+                        0);           // null pattern
     }
 
     /*
@@ -701,7 +709,7 @@ public:
         sample.range = LF(prev_sample.range,c);
 
         // pattern cP was not found
-        if (sample.is_invalid()) return sample;
+        if (sample.is_invalid()) return get_invalid_sample();
 
         // cP and aP occurs for some a s.t. a != c
         if (prev_sample.range.second - prev_sample.range.first != 
@@ -770,7 +778,7 @@ public:
         sample.rangeR = LFR(prev_sample.rangeR,c);
 
         // pattern Pc was not found
-        if (sample.is_invalid()) return sample;
+        if (sample.is_invalid()) return get_invalid_sample();
 
         // Pc and Pa occurs for some a s.t. a != c
         if (prev_sample.rangeR.second - prev_sample.rangeR.first != 
@@ -969,7 +977,7 @@ public:
         sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
 
         // updating j, d, len (very simple for contraction)
-        if (sample.d == sample.len - 1) 
+        if (sample.len > 1 && sample.d == sample.len - 1) 
         {
             sample.j--; sample.d--;
         }
@@ -984,26 +992,37 @@ public:
     // suffix tree op: parent
     br_sample parent(br_sample const& sample)
     {
-        br_sample new_sample(sample);
-        br_sample tmp(right_contraction(sample));
-        while (tmp.size() == new_sample.size())
+        assert(sample.len > 0);
+
+        br_sample par_sample(right_contraction(sample));
+
+        if (sample.is_leaf() || par_sample.len == 0) return par_sample;
+
+        br_sample tmp(sample);
+        while (par_sample.size() == tmp.size())
         {
-            new_sample = tmp;
-            tmp = right_contraction(new_sample);
+            tmp = par_sample;
+            par_sample = right_contraction(tmp);
         }
-        return tmp;
+        return par_sample;
     }
 
     // suffix tree op: child
-    br_sample child(uchar c, br_sample const& sample)
+    br_sample child(br_sample const& sample, uchar c)
     {
+        if (sample.is_leaf()) return get_invalid_sample();
+
         br_sample new_sample(right_extension(c,sample));
-        uchar a = bwt_R[new_sample.rangeR.first]
-        range_t range = LFR(new_sample.rangeR,a);
-        while (range.second + 1 - range.first == new_sample.rangeR.second + 1 - new_sample.rangeR.first)
+        if (new_sample.is_invalid() || new_sample.is_leaf()) return new_sample;
+
+        uchar a = bwtR[new_sample.rangeR.first];
+        range_t rangeR = LFR(new_sample.rangeR,a);
+        while (rangeR.second + 1 - rangeR.first == new_sample.rangeR.second + 1 - new_sample.rangeR.first)
         {
-            new_sample.rangeR = range;
-            range = LFR(range, bwt_R[range.first]);
+            new_sample.rangeR.first = rangeR.first;
+            new_sample.rangeR.second = rangeR.second;
+            new_sample.len++;
+            rangeR = LFR(rangeR, bwtR[rangeR.first]);
         }
         return new_sample;
     }
@@ -1011,11 +1030,12 @@ public:
     // suffix tree op: suffix-link
     br_sample slink(br_sample const& sample)
     {
+        assert(sample.size() > 1);
         return left_contraction(sample);
     }
 
     // suffix tree op: weiner-link
-    br_sample wlink(uchar c, br_sample const& sample)
+    br_sample wlink(br_sample const& sample, uchar c)
     {
         return left_extension(c,sample);
     }
@@ -1027,44 +1047,95 @@ public:
         {
             br_sample anc(left);
             while (!anc.contains(right)) anc = parent(anc);
+
+            /*
+            std::cout << "(lca)" << std::endl;
+            std::cout << "  range:" << anc.range.first << "," << anc.range.second << " len:" << anc.len << std::endl;
+            std::cout << "  j:" << anc.j << "  d:" << anc.d << std::endl;
+            std::cout << " (lca left)" << std::endl;
+            std::cout << "   range:" << left.range.first << "," << left.range.second << " len:" << left.len << std::endl;
+            std::cout << "   j:" << left.j << "  d:" << left.d << std::endl;
+            std::cout << " (lca right)" << std::endl;
+            std::cout << "   range:" << right.range.first << "," << right.range.second << " len:" << right.len << std::endl;
+            std::cout << "   j:" << right.j << "  d:" << right.d << std::endl;
+            */
+
             return anc;
         }
         else 
         {
             br_sample anc(right);
             while (!anc.contains(left)) anc = parent(anc);
+
+            /*
+            std::cout << "(lca)" << std::endl;
+            std::cout << "  range:" << anc.range.first << "," << anc.range.second << " len:" << anc.len << std::endl;
+            std::cout << "  j:" << anc.j << "  d:" << anc.d << std::endl;
+            std::cout << " (lca right)" << std::endl;
+            std::cout << "   range:" << right.range.first << "," << right.range.second << " len:" << right.len << std::endl;
+            std::cout << "   j:" << right.j << "  d:" << right.d << std::endl;
+            std::cout << " (lca left)" << std::endl;
+            std::cout << "   range:" << left.range.first << "," << left.range.second << " len:" << left.len << std::endl;
+            std::cout << "   j:" << left.j << "  d:" << left.d << std::endl;
+            */
+
             return anc;
         }
     }
 
     // suffix tree op: ancestor(v,w)
-    bool ancestor(br_sample const& v, br_sample const& w) { return v.contains(w); }
+    bool ancestor(br_sample const& v, br_sample const& w) const { return v.contains(w); }
+
+    // suffix tree op: is_leaf(u)
+    inline bool is_leaf(br_sample const& sample) const { return sample.is_leaf(); }
+    // detecting invalid sample
+    inline bool is_invalid(br_sample const& sample) const { return sample.is_invalid(); }
 
     // suffix tree op: string-depth(v)
-    ulint sdepth(br_sample const& sample) { return sample.len; }
-
-    /*
+    ulint sdepth(br_sample const& sample)
+    { 
+        if (sample.is_leaf()) return bwt.size() - (sample.j - sample.d);
+        return sample.len; 
+    }
+    
     // suffix tree op: first-child(v)
     br_sample fchild(br_sample const& sample)
     {
-        
+        for (ulint a = 1; a <= sigma; ++a)
+        {
+            br_sample new_sample(child(sample,remap_inv[a]));
+            if (!new_sample.is_invalid()) return new_sample;
+        }
+        return get_invalid_sample();
     }
-
+    
     // suffix tree op: next-sibling(v)
     br_sample nsibling(br_sample const& sample)
     {
 
+        br_sample par_sample(parent(sample));
+        ulint p = sample.rangeR.first;
+        for (ulint i = 0; i < sample.len-par_sample.len; ++i) p = FLR(p);
+
+        uchar c = bwtR[p];
+        br_sample new_sample;
+        for (ulint a = c+1; a <= sigma; ++a)
+        {
+            new_sample = child(par_sample,remap_inv[a]);
+            if (!new_sample.is_invalid()) return new_sample;
+        }
+        return get_invalid_sample();
     }
-    */
+    
 
     // suffix tree op: children(v)
     std::vector<br_sample> children(br_sample const& sample)
     {
         std::vector<br_sample> res;
-        for (ulint a = 1; a < c; ++a)
+        for (ulint a = 1; a <= sigma; ++a)
         {
-            br_sample tmp(child(remap_inv[a],sample));
-            res.push_back(tmp);
+            br_sample tmp(child(sample,remap_inv[a]));
+            if (!tmp.is_invalid()) res.push_back(tmp);
         }
         return res;
     }
@@ -1072,8 +1143,8 @@ public:
     // suffix tree op: letter(v,i)
     uchar letter(br_sample const& sample, ulint i)
     {
-        assert(i < sample.len);
-        if (2 * i <= sample.len)
+        assert(i < sample.len || (sample.is_leaf() && i < bwt.size() - (sample.j-sample.d)));
+        if ((i<<1) <= sample.len)
         {
             ulint p = sample.range.first;
             for (ulint j = 0; j <= i; ++j)
@@ -1082,12 +1153,21 @@ public:
             }
             return remap_inv[bwt[p]];
         }
-        else 
+        else if (i < sample.len)
         {
             ulint p = sample.rangeR.first;
-            for (ulint j = 0; j < len-i; ++j)
+            for (ulint j = 0; j < sample.len-i; ++j)
             {
                 p = FLR(p);
+            }
+            return remap_inv[bwtR[p]];
+        }
+        else // sample.is_leaf() && i < bwt.size() - (sample.j-sample.d)
+        {
+            ulint p = sample.rangeR.first;
+            for (ulint k = 0; k < i - sample.len; ++k)
+            {
+                p = LFR(p);
             }
             return remap_inv[bwtR[p]];
         }
@@ -1225,6 +1305,48 @@ public:
             if (sample.is_invalid()) return {};
         }
         return locate_sample(sample);
+    }
+
+    // gets MEMs
+    void maximal_exact_match(std::string const& pattern)
+    {
+        ulint m = pattern.size();
+        ulint j = 0, l = 0, max_l = 0;
+        bool extended = false;
+
+        br_sample sample(get_initial_sample());
+
+        for (ulint i = 0; i < m; ++i)
+        {
+            while (j < m)
+            {
+                br_sample new_sample = right_extension((uchar)pattern[j],sample);
+                if (new_sample.is_invalid()) break;
+                extended = true;
+                sample = new_sample;
+                l++;
+                j++;
+            }
+            if (extended)
+            {
+                //std::cout << "MEM found  offset: " << i << " length: "<< l << std::endl;
+                std::cout << l << std::endl;
+            }
+            
+            if (i == j)
+            {
+                sample = get_initial_sample();
+                j++;
+                l = 0;
+            }
+            else 
+            {
+                sample = left_contraction(sample);
+                l--;
+            }
+            extended = false;
+        }
+
     }
 
 

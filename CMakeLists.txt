@@ -54,15 +54,20 @@ TARGET_LINK_LIBRARIES(bri-space divsufsort64)
 # TARGET_LINK_LIBRARIES(k_vs_time divsufsort)
 # TARGET_LINK_LIBRARIES(k_vs_time divsufsort64)
 
-ADD_EXECUTABLE(k_vs_space src/k_vs_space.cpp)
-TARGET_LINK_LIBRARIES(k_vs_space sdsl)
-TARGET_LINK_LIBRARIES(k_vs_space divsufsort)
-TARGET_LINK_LIBRARIES(k_vs_space divsufsort64)
+# ADD_EXECUTABLE(k_vs_space src/k_vs_space.cpp)
+# TARGET_LINK_LIBRARIES(k_vs_space sdsl)
+# TARGET_LINK_LIBRARIES(k_vs_space divsufsort)
+# TARGET_LINK_LIBRARIES(k_vs_space divsufsort64)
 
-ADD_EXECUTABLE(window_slide src/window_slide.cpp)
-TARGET_LINK_LIBRARIES(window_slide sdsl)
-TARGET_LINK_LIBRARIES(window_slide divsufsort)
-TARGET_LINK_LIBRARIES(window_slide divsufsort64)
+# ADD_EXECUTABLE(window_slide src/window_slide.cpp)
+# TARGET_LINK_LIBRARIES(window_slide sdsl)
+# TARGET_LINK_LIBRARIES(window_slide divsufsort)
+# TARGET_LINK_LIBRARIES(window_slide divsufsort64)
+
+ADD_EXECUTABLE(x_treeop src/x_treeop.cpp)
+TARGET_LINK_LIBRARIES(x_treeop sdsl)
+TARGET_LINK_LIBRARIES(x_treeop divsufsort)
+TARGET_LINK_LIBRARIES(x_treeop divsufsort64)
 
 
 enable_testing()

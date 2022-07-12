@@ -84,18 +84,23 @@ struct br_sample {
     }
 
     // the pattern does not exist
-    bool is_invalid() const
+    inline bool is_invalid() const
     {
         return (range.first > range.second) || (rangeR.first > rangeR.second);
     }
 
-    bool contains(br_sample const& other) const
+    inline bool is_leaf() const
     {
-        return range.first <= other.range.first && other.range.second <= range.second
+        return size() == 1;
+    }
+
+    inline bool contains(br_sample const& other) const
+    {
+        return range.first <= other.range.first && other.range.second <= range.second;
     }
 
     // range size
-    ulint size() const
+    inline ulint size() const
     {
         return range.second + 1 - range.first;
     }

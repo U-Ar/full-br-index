@@ -24,7 +24,7 @@ void help(){
 	cout << "   -o <basename>        use <basename> as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
     cout << "   -limited             build limited version of br-index optimized for finding MEMs." << endl;
     cout << "                        space-efficient, but right-contraction is not supported." << endl;
-    cout << "   -fixed <length>      build <length>-dimensional de Bruijn br-index." << endl;
+    cout << "   -fixed <length>      build br-suffix-tree." << endl;
     cout << "                        contractions are supported for only fixed length pattern." << endl;
     cout << "                        (uncompatible with -limited flag)" << endl;
 	cout << "   -divsufsort          use divsufsort algorithm to build the BWT (fast, 7.5n Bytes of RAM). By default,"<<endl;
@@ -137,7 +137,7 @@ int main(int argc, char** argv)
 
     if (length > 0)
     {
-        br_index_fixed<> idx(input,(unsigned long)length,sais);
+        br_index_st<> idx(input,(unsigned long)length,sais);
         idx.save_to_file(idx_file);
     } 
     else if (limited)
@@ -147,7 +147,7 @@ int main(int argc, char** argv)
     }
     else 
     {
-        br_index_st<> idx(input,(unsigned long)length,sais);
+        br_index<> idx(input,sais);
         idx.save_to_file(idx_file);
     }
     
