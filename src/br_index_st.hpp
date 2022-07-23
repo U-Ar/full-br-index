@@ -1140,6 +1140,18 @@ public:
         return res;
     }
 
+    // child characters
+    std::vector<uchar> child_chars(br_sample const& sample)
+    {
+        std::vector<uchar> res;
+        for (ulint a = 1; a <= sigma; ++a)
+        {
+            range_t rangeR = LFR(sample.rangeR,a);
+            if (rangeR.second+1-rangeR.first > 0) res.push_back(remap_inv[a]);
+        }
+        return res;
+    }
+
     // suffix tree op: letter(v,i)
     uchar letter(br_sample const& sample, ulint i)
     {
