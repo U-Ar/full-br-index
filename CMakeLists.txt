@@ -24,16 +24,6 @@ TARGET_LINK_LIBRARIES(bri-build sdsl)
 TARGET_LINK_LIBRARIES(bri-build divsufsort)
 TARGET_LINK_LIBRARIES(bri-build divsufsort64)
 
-# ADD_EXECUTABLE(bri-count src/bri-count.cpp)
-# TARGET_LINK_LIBRARIES(bri-count sdsl)
-# TARGET_LINK_LIBRARIES(bri-count divsufsort)
-# TARGET_LINK_LIBRARIES(bri-count divsufsort64)
-
-# ADD_EXECUTABLE(bri-locate src/bri-locate.cpp)
-# TARGET_LINK_LIBRARIES(bri-locate sdsl)
-# TARGET_LINK_LIBRARIES(bri-locate divsufsort)
-# TARGET_LINK_LIBRARIES(bri-locate divsufsort64)
-
 ADD_EXECUTABLE(bri-mem src/bri-mem.cpp)
 TARGET_LINK_LIBRARIES(bri-mem sdsl)
 TARGET_LINK_LIBRARIES(bri-mem divsufsort)
@@ -44,31 +34,6 @@ TARGET_LINK_LIBRARIES(bri-space sdsl)
 TARGET_LINK_LIBRARIES(bri-space divsufsort)
 TARGET_LINK_LIBRARIES(bri-space divsufsort64)
 
-# ADD_EXECUTABLE(fixedtest src/fixedtest.cpp)
-# TARGET_LINK_LIBRARIES(fixedtest sdsl)
-# TARGET_LINK_LIBRARIES(fixedtest divsufsort)
-# TARGET_LINK_LIBRARIES(fixedtest divsufsort64)
-
-# ADD_EXECUTABLE(k_vs_time src/k_vs_time.cpp)
-# TARGET_LINK_LIBRARIES(k_vs_time sdsl)
-# TARGET_LINK_LIBRARIES(k_vs_time divsufsort)
-# TARGET_LINK_LIBRARIES(k_vs_time divsufsort64)
-
-# ADD_EXECUTABLE(k_vs_space src/k_vs_space.cpp)
-# TARGET_LINK_LIBRARIES(k_vs_space sdsl)
-# TARGET_LINK_LIBRARIES(k_vs_space divsufsort)
-# TARGET_LINK_LIBRARIES(k_vs_space divsufsort64)
-
-# ADD_EXECUTABLE(window_slide src/window_slide.cpp)
-# TARGET_LINK_LIBRARIES(window_slide sdsl)
-# TARGET_LINK_LIBRARIES(window_slide divsufsort)
-# TARGET_LINK_LIBRARIES(window_slide divsufsort64)
-
-ADD_EXECUTABLE(x_treeop src/x_treeop.cpp)
-TARGET_LINK_LIBRARIES(x_treeop sdsl)
-TARGET_LINK_LIBRARIES(x_treeop divsufsort)
-TARGET_LINK_LIBRARIES(x_treeop divsufsort64)
-
 
 enable_testing()
 
@@ -77,7 +42,6 @@ add_executable(run_tests test/run_tests.cpp
 	test/huffman_string_test.cpp
 	test/rle_string_test.cpp
 	test/permuted_lcp_test.cpp
-	test/br_index_test.cpp
 )
 target_link_libraries(run_tests PRIVATE sdsl divsufsort divsufsort64)
 

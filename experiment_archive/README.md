@@ -13,4 +13,4 @@ You can build this directory independently.
 - src/bri-mems.cpp is the code to evaluate Maximal Exact Matches.
 - src/x_treeop.cpp is the code to evaluate basic suffix tree operations.
 
-src/k_vs_time.cpp was not used.
+src/k_vs_time.cpp and src/fixedtest.cpp was not used.
