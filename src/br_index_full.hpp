@@ -28,6 +28,7 @@ public:
     /*
      * constructor. 
      * \param input: string on which br-index is built
+     * \param length: parameter bl which effect the contraction algorithms and the index size.
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
@@ -977,55 +978,189 @@ public:
     }
 
 
-    // outdegree of the current node in the de Bruijn graph
-    ulint outdegree(br_sample const& sample)
-    {
-        assert(sample.len <= length);
-        br_sample tmp(sample);
-        if (tmp.len == length) tmp = left_contraction(tmp);
+    // suffix tree op: root
+    br_sample root() { return get_initial_sample(); }
 
-        ulint res = 0;
-        for (uchar c = 1; c <= sigma; ++c)
+    // suffix tree op: parent
+    br_sample parent(br_sample const& sample)
+    {
+        assert(sample.len > 0);
+
+        br_sample par_sample(right_contraction(sample));
+
+        if (sample.is_leaf() || par_sample.len == 0) return par_sample;
+
+        br_sample tmp(sample);
+        while (par_sample.size() == tmp.size())
         {
-            range_t range = LFR(c,tmp.rangeR);
-            if (range.second + 1 - range.first > 0) res++;
+            tmp = par_sample;
+            par_sample = right_contraction(tmp);
+        }
+        return par_sample;
+    }
+
+    // suffix tree op: child
+    br_sample child(br_sample const& sample, uchar c)
+    {
+        if (sample.is_leaf()) return get_invalid_sample();
+
+        br_sample new_sample(right_extension(c,sample));
+        if (new_sample.is_invalid() || new_sample.is_leaf()) return new_sample;
+
+        uchar a = bwtR[new_sample.rangeR.first];
+        range_t rangeR = LFR(new_sample.rangeR,a);
+        while (rangeR.second + 1 - rangeR.first == new_sample.rangeR.second + 1 - new_sample.rangeR.first)
+        {
+            new_sample.rangeR.first = rangeR.first;
+            new_sample.rangeR.second = rangeR.second;
+            new_sample.len++;
+            rangeR = LFR(rangeR, bwtR[rangeR.first]);
+        }
+        return new_sample;
+    }
+
+    // suffix tree op: suffix-link
+    br_sample slink(br_sample const& sample)
+    {
+        assert(sample.size() > 1);
+        return left_contraction(sample);
+    }
+
+    // suffix tree op: weiner-link
+    br_sample wlink(br_sample const& sample, uchar c)
+    {
+        return left_extension(c,sample);
+    }
+
+    // suffix tree op: lowest common ancestor
+    br_sample lca(br_sample const& left, br_sample const& right)
+    {
+        if (left.len <= right.len) 
+        {
+            br_sample anc(left);
+            while (!anc.contains(right)) anc = parent(anc);
+
+            return anc;
+        }
+        else 
+        {
+            br_sample anc(right);
+            while (!anc.contains(left)) anc = parent(anc);
+
+            return anc;
+        }
+    }
+
+    // suffix tree op: ancestor(v,w)
+    bool ancestor(br_sample const& v, br_sample const& w) const { return v.contains(w); }
+
+    // suffix tree op: is_leaf(u)
+    inline bool is_leaf(br_sample const& sample) const { return sample.is_leaf(); }
+    // detecting invalid sample
+    inline bool is_invalid(br_sample const& sample) const { return sample.is_invalid(); }
+
+    // suffix tree op: string-depth(v)
+    ulint sdepth(br_sample const& sample)
+    { 
+        if (sample.is_leaf()) return bwt.size() - (sample.j - sample.d);
+        return sample.len; 
+    }
+    
+    // suffix tree op: first-child(v)
+    br_sample fchild(br_sample const& sample)
+    {
+        for (ulint a = 1; a <= sigma; ++a)
+        {
+            br_sample new_sample(child(sample,remap_inv[a]));
+            if (!new_sample.is_invalid()) return new_sample;
+        }
+        return get_invalid_sample();
+    }
+    
+    // suffix tree op: next-sibling(v)
+    br_sample nsibling(br_sample const& sample)
+    {
+
+        br_sample par_sample(parent(sample));
+        ulint p = sample.rangeR.first;
+        for (ulint i = 0; i < sample.len-par_sample.len; ++i) p = FLR(p);
+
+        uchar c = bwtR[p];
+        br_sample new_sample;
+        for (ulint a = c+1; a <= sigma; ++a)
+        {
+            new_sample = child(par_sample,remap_inv[a]);
+            if (!new_sample.is_invalid()) return new_sample;
+        }
+        return get_invalid_sample();
+    }
+    
+
+    // suffix tree op: children(v)
+    std::vector<br_sample> children(br_sample const& sample)
+    {
+        std::vector<br_sample> res;
+        for (ulint a = 1; a <= sigma; ++a)
+        {
+            br_sample tmp(child(sample,remap_inv[a]));
+            if (!tmp.is_invalid()) res.push_back(tmp);
         }
         return res;
     }
 
-    // indegree of the current node in the de Bruijn graph
-    ulint indegree(br_sample const& sample)
+    // child characters
+    std::vector<uchar> child_chars(br_sample const& sample)
     {
-        assert(sample.len <= length);
-        br_sample tmp(sample);
-        if (tmp.len == length) tmp = right_contraction(tmp);
-
-        ulint res = 0;
-        for (uchar c = 1; c <= sigma; ++c)
+        std::vector<uchar> res;
+        for (ulint a = 1; a <= sigma; ++a)
         {
-            range_t range = LF(c,tmp.range);
-            if (range.second + 1 - range.first > 0) res++;
+            range_t rangeR = LFR(sample.rangeR,a);
+            if (rangeR.second+1-rangeR.first > 0) res.push_back(remap_inv[a]);
         }
         return res;
     }
 
-    // traverse the outgoing edge with label c in the de Bruijn graph
-    br_sample outgoing(uchar c, br_sample const& prev_sample)
+    // suffix tree op: letter(v,i)
+    uchar letter(br_sample const& sample, ulint i)
     {
-        assert(prev_sample.len <= length);
-        if (prev_sample.len < length) return right_extension(c,prev_sample);
-        return right_extension(c,left_contraction(prev_sample));
+        assert(i < sample.len || (sample.is_leaf() && i < bwt.size() - (sample.j-sample.d)));
+        if ((i<<1) <= sample.len)
+        {
+            ulint p = sample.range.first;
+            for (ulint j = 0; j <= i; ++j)
+            {
+                p = FL(p);
+            }
+            return remap_inv[bwt[p]];
+        }
+        else if (i < sample.len)
+        {
+            ulint p = sample.rangeR.first;
+            for (ulint j = 0; j < sample.len-i; ++j)
+            {
+                p = FLR(p);
+            }
+            return remap_inv[bwtR[p]];
+        }
+        else // sample.is_leaf() && i < bwt.size() - (sample.j-sample.d)
+        {
+            ulint p = sample.rangeR.first;
+            for (ulint k = 0; k < i - sample.len; ++k)
+            {
+                p = LFR(p);
+            }
+            return remap_inv[bwtR[p]];
+        }
     }
 
-    // traverse the incoming edge with label c in the de Bruijn graph
-    br_sample incoming(uchar c, br_sample const& prev_sample)
-    {
-        assert(prev_sample.len <= length);
-        if (prev_sample.len < length) return left_extension(c,prev_sample);
-        return left_extension(c,right_contraction(prev_sample));
-    }
+    // suffix tree ops not supported:
+    // - tree-depth
+    // - level-ancestor-string
+    // - level-ancestor-tree
+    // they can be naively computed by iteratively applying right-contraction
 
-    // node label in the de Bruijn graph
+
+    // node label
     std::string label(br_sample const& sample)
     {
         std::string res;
