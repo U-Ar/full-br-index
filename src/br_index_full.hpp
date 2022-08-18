@@ -2,12 +2,8 @@
  * bi-directional r-index with acceleration to short patterns
  */
 
-/*
- * Experimental, very very many components
- */
-
-#ifndef INCLUDED_BR_INDEX_FIXED_HPP
-#define INCLUDED_BR_INDEX_FIXED_HPP
+#ifndef INCLUDED_BR_INDEX_FULL_HPP
+#define INCLUDED_BR_INDEX_FULL_HPP
 
 #include "definitions.hpp"
 #include "rle_string.hpp"
@@ -21,13 +17,13 @@ template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
 >
-class br_index_fixed {
+class br_index_full {
 
 public:
 
     using triple = std::tuple<range_t, ulint, ulint>;
 
-    br_index_fixed() {}
+    br_index_full() {}
 
     /*
      * constructor. 
@@ -35,7 +31,7 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index_fixed(std::string const& input, ulint length=8, bool sais = true)
+    br_index_full(std::string const& input, ulint length=8, bool sais = true)
     {
         assert(length > 0);
         this->length = length;
@@ -429,20 +425,6 @@ public:
 
             kmer_startR.push_back(sparse_bitvector_t(kmer_start_vectorR));
             kmer_endR.push_back(sparse_bitvector_t(kmer_end_vectorR));
-        }
-
-        // construct kmer_start_all, kmer_end_all
-        kmer_start_all = {};
-        for (ulint k = 0; k < length; ++k)
-        {
-            std::vector<bool> kmer_start_vector(text.size()+1,false);
-            kmer_start_vector[0] = true;
-            kmer_start_vector[text.size()] = true;
-            for (ulint i = 1; i < text.size(); ++i)
-            {
-                if (lcp[i] < k) kmer_start_vector[i] = true;
-            }
-            kmer_start_all.push_back(sparse_bitvector_t(kmer_start_vector));
         }
 
         // release LCP cache
@@ -994,112 +976,6 @@ public:
         return sample;
     }
 
-    // left-extension for uni version
-    br_sample left_extension_uni(uchar c, br_sample const& prev_sample)
-    {
-        // replace c with internal representation
-        c = remap[c];
-
-        br_sample sample(prev_sample);
-
-        // get SA range of cP
-        sample.range = LF(prev_sample.range,c);
-
-        // pattern cP was not found
-        if (sample.is_invalid()) return sample;
-
-        // cP and aP occurs for some a s.t. a != c
-        if (prev_sample.range.second - prev_sample.range.first != 
-            sample.range.second      - sample.range.first)
-        {
-            // fint last c in range and get its sample
-            // there must be at least one c due to the previous if clause
-            ulint rnk = bwt.rank(prev_sample.range.second+1,c);
-            assert(rnk > 0);
-
-            // update p by corresponding BWT position
-            ulint p = bwt.select(rnk-1,c);
-            assert(p >= prev_sample.range.first && p <= prev_sample.range.second);
-
-            // run number of position p
-            ulint run_of_p = bwt.run_of_position(p);
-
-            // update j by SA[p]
-            if (bwt[prev_sample.range.second] == c)
-                sample.j = samples_first[run_of_p];
-            else
-                sample.j = samples_last[run_of_p];
-
-            // reset d
-            sample.d = 0;
-
-        }
-        else // only c precedes P 
-        {
-            // increment offset by 1
-            sample.d++;
-        }
-        sample.len++;
-        return sample;
-    }
-
-    /*
-     * right_contraction for uni version
-     */
-    br_sample right_contraction_uni(br_sample const& prev_sample)
-    {
-        br_sample sample(prev_sample);
-        assert(sample.len >= 1);
-
-        if (sample.len <= length)
-        {
-            ulint ones = kmer_start_all[sample.len-1].rank(sample.range.first+1);
-            sample.range.first  = kmer_start_all[sample.len-1].select(ones - 1);
-            sample.range.second = kmer_start_all[sample.len-1].select(ones) - 1;
-            assert(sample.range.first <= prev_sample.range.first);
-            assert(sample.range.second >= prev_sample.range.second);
-        }
-        else 
-        {
-            ulint pos = sample.j - sample.d;
-            while (plcp[pos] >= sample.len)
-            {
-                pos = Phi(pos);
-            }
-            while (plcp[pos] >= sample.len-1)
-            {
-                pos = Phi(pos);
-                sample.range.first--;
-            }
-            pos = sample.j - sample.d;
-            while (true)
-            {
-                if (pos == last_SA_val) break;
-                pos = PhiI(pos);
-                if (plcp[pos] < sample.len) break;
-            }
-            if (plcp[pos] == sample.len-1) 
-            {
-                sample.range.second++;
-                while (true)
-                {
-                    if (pos == last_SA_val) break;
-                    pos = PhiI(pos);
-                    if (plcp[pos] < sample.len-1) break;
-                    sample.range.second++;
-                }
-            }
-        }
-
-        // updating j, d, len (very simple for contraction)
-        if (sample.d == sample.len - 1) 
-        {
-            sample.j--; sample.d--;
-        }
-        sample.len--;
-
-        return sample;
-    }
 
     // outdegree of the current node in the de Bruijn graph
     ulint outdegree(br_sample const& sample)
@@ -1377,9 +1253,6 @@ public:
             w_bytes += kmer_endR[k].serialize(out);
         }
 
-        for (ulint k = 0; k < length; ++k)
-            w_bytes += kmer_start_all[k].serialize(out);
-
         w_bytes += plcp.serialize(out);
         w_bytes += plcpR.serialize(out);
 
@@ -1440,10 +1313,6 @@ public:
             kmer_startR[k].load(in);
             kmer_endR[k].load(in);
         }
-
-        kmer_start_all.resize(length);
-        for (ulint k = 0; k < length; ++k)
-            kmer_start_all[k].load(in);
 
         plcp.load(in);
         plcpR.load(in);
@@ -1601,99 +1470,9 @@ public:
         }
         std::cout << kmer_bytes << " bytes" << std::endl;
 
-        /*
-        std::cout << "kmer_start_all: ";
-        kmer_bytes = 0;
-        for (ulint k = 0; k < fix; ++k)
-        {
-            bytes = kmer_start_all[k].serialize(out);
-            kmer_bytes += bytes;
-            tot_bytes += bytes;
-        }
-        std::cout << kmer_bytes << " bytes" << std::endl;
-        */
-
 
         std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
         std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl;
-
-        return tot_bytes;
-
-    }
-
-
-    ulint print_space_uni(ulint fix)
-    {
-        std::cout << "(print_space_uni)" << std::endl;
-        std::cout << "text length           : " << bwt.size() << std::endl;
-        std::cout << "alphabet size         : " << sigma << std::endl;
-        std::cout << "number of runs in bwt : " << bwt.number_of_runs() << std::endl;
-        std::cout << "numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
-        
-        ulint tot_bytes = sizeof(sigma)
-                        + sizeof(length)
-                        + 256*sizeof(uchar)
-                        + 256*sizeof(uchar)
-                        + sizeof(terminator_position)
-                        + sizeof(terminator_positionR)
-                        + sizeof(last_SA_val)
-                        + 256*sizeof(ulint);
-        
-        std::cout << "fixed pattern length: " << length << std::endl;
-        
-        tot_bytes += bwt.print_space();
-        //tot_bytes += bwtR.print_space();
-        std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
-
-        tot_bytes += plcp.print_space();
-        //tot_bytes += plcpR.print_space();
-
-        std::ofstream out("/dev/null");
-
-        ulint bytes = 0;
-
-        
-        bytes =  samples_first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << " bytes" << std::endl;
-
-        bytes =  samples_last.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_last: " << bytes << " bytes" << std::endl;
-
-
-        bytes =  first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "first: " << bytes << " bytes" << std::endl;
-
-        bytes =  first_to_run.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "first_to_run: " << bytes << " bytes" << std::endl;
-
-
-        bytes =  last.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "last: " << bytes << " bytes" << std::endl;
-
-        bytes =  last_to_run.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "last_to_run: " << bytes << " bytes" << std::endl;
-
-
-
-        std::cout << "kmer_start_all: ";
-        ulint kmer_bytes = 0;
-        for (ulint k = 0; k < fix; ++k)
-        {
-            bytes = kmer_start_all[k].serialize(out);
-            kmer_bytes += bytes;
-            tot_bytes += bytes;
-        }
-        std::cout << kmer_bytes << " bytes" << std::endl;
-
-
-        std::cout << "<total space of br-index uni version>: " << tot_bytes << " bytes" << std::endl << std::endl;
-        std::cout << "<bits/symbol>            : " << (double) tot_bytes * 8 / (double) bwt.size() << std::endl << std::endl;
 
         return tot_bytes;
 
@@ -1898,12 +1677,9 @@ private:
     std::vector<sparse_bitvector_t> kmer_startR;
     std::vector<sparse_bitvector_t> kmer_endR;
 
-    // mono-directional right_contraction
-    std::vector<sparse_bitvector_t> kmer_start_all;
-
 
 };
 
 };
 
-#endif /* INCLUDED_BR_INDEX_FIXED_HPP */
+#endif /* INCLUDED_BR_INDEX_FULL_HPP */
