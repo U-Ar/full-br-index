@@ -1318,7 +1318,7 @@ public:
             }
             if (extended)
             {
-                std::cout << "Maximal substring starting from position: " << i << " length: "<< l << std::endl;
+                std::cout << "Starting from: " << i << " length: "<< l << std::endl;
             }
             
             if (i == j)
