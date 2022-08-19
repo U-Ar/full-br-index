@@ -222,7 +222,7 @@ public:
         std::cout << "Number of BWT^R equal-letter runs: rR = " << rR << std::endl << std::endl;
 
         // Phi, Phi inverse is needed only in forward case
-        std::cout << "(4/5) Building predecessor R_c, R_c^R and Phi/Phi^{-1}/Phi_R/Phi^{-1}_R function ..." << std::flush;
+        std::cout << "(4/5) Building predecessor/successor on R_c, R_c^R and Phi/Phi^{-1}/Phi_R/Phi^{-1}_R function ..." << std::flush;
 
         
         samples_last = sdsl::int_vector<>(r,0,log_n);
@@ -1565,7 +1565,7 @@ public:
                         + sizeof(last_SA_val)
                         + 256*sizeof(ulint);
         
-        std::cout << "fixed pattern length: " << length << std::endl;
+        std::cout << "(parameter bl=" << length << ")" << std::endl << std::endl;
         
         tot_bytes += bwt.print_space();
         tot_bytes += bwtR.print_space();
@@ -1581,29 +1581,29 @@ public:
         
         bytes =  samples_first.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << " bytes" << std::endl;
+        std::cout << "samples_first:  " << bytes << " bytes" << std::endl;
 
         bytes =  samples_last.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_last: " << bytes << " bytes" << std::endl;
+        std::cout << "samples_last:   " << bytes << " bytes" << std::endl;
 
 
         bytes =  first.serialize(out);
         tot_bytes += bytes;
-        std::cout << "first: " << bytes << " bytes" << std::endl;
+        std::cout << "first:          " << bytes << " bytes" << std::endl;
 
         bytes =  first_to_run.serialize(out);
         tot_bytes += bytes;
-        std::cout << "first_to_run: " << bytes << " bytes" << std::endl;
+        std::cout << "first_to_run:   " << bytes << " bytes" << std::endl;
 
 
         bytes =  last.serialize(out);
         tot_bytes += bytes;
-        std::cout << "last: " << bytes << " bytes" << std::endl;
+        std::cout << "last:           " << bytes << " bytes" << std::endl;
 
         bytes =  last_to_run.serialize(out);
         tot_bytes += bytes;
-        std::cout << "last_to_run: " << bytes << " bytes" << std::endl;
+        std::cout << "last_to_run:    " << bytes << " bytes" << std::endl;
 
 
         bytes =  samples_firstR.serialize(out);
@@ -1612,27 +1612,26 @@ public:
 
         bytes =  samples_lastR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_lastR: " << bytes << " bytes" << std::endl;
+        std::cout << "samples_lastR:  " << bytes << " bytes" << std::endl;
 
 
         bytes =  firstR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "firstR: " << bytes << " bytes" << std::endl;
+        std::cout << "firstR:         " << bytes << " bytes" << std::endl;
 
         bytes =  first_to_runR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "first_to_runR: " << bytes << " bytes" << std::endl;
+        std::cout << "first_to_runR:  " << bytes << " bytes" << std::endl;
 
 
         bytes =  lastR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "lastR: " << bytes << " bytes" << std::endl;
+        std::cout << "lastR:          " << bytes << " bytes" << std::endl;
 
         bytes =  last_to_runR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "last_to_runR: " << bytes << " bytes" << std::endl;
+        std::cout << "last_to_runR:   " << bytes << " bytes" << std::endl;
 
-        std::cout << "(parameter bl: " << length << ")" << std::endl;
         std::cout << "kmer_start, kmer_end, kmer_startR, kmer_endR: ";
         ulint kmer_bytes = 0;
         for (ulint k = 0; k < fix; ++k)
