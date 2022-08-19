@@ -47,11 +47,11 @@ public:
 
         }
 
-        std::cout << "Text length = " << input.size() << std::endl << std::endl;
+        std::cout << "Text length = " << input.size() << std::endl;
 
-        std::cout << "Border pattern length = " << length << std::endl;
+        std::cout << "Parameter bl = " << length << std::endl << std::endl;
 
-        std::cout << "(1/4) Remapping alphabet ... " << std::flush;
+        std::cout << "(1/5) Remapping alphabet ... " << std::flush;
         
         // build RLBWT
 
@@ -85,7 +85,7 @@ public:
         }
 
         std::cout << "done." << std::endl;
-        std::cout << "(2/4) Building BWT, BWT^R, PLCP and computing SA samples";
+        std::cout << "(2/5) Building BWT, BWT^R, PLCP, PLCP^R and storing SA samples";
         if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
         else std::cout << " (DIVSUFSORT) ... " << std::flush;
 
@@ -165,7 +165,7 @@ public:
         std::vector<range_t>& samples_first_vecR = std::get<1>(bwt_and_samplesR);
         std::vector<range_t>& samples_last_vecR = std::get<2>(bwt_and_samplesR);
 
-        std::cout << "done.\n(3/4) Run-length encoding BWT ... " << std::flush;
+        std::cout << "done.\n(3/5) Run-length encoding BWT ... " << std::flush;
 
 
         // run length compression on BWT and BWTR
@@ -222,7 +222,7 @@ public:
         std::cout << "Number of BWT^R equal-letter runs: rR = " << rR << std::endl << std::endl;
 
         // Phi, Phi inverse is needed only in forward case
-        std::cout << "(4/4) Building predecessor for toehold lemma & Phi/Phi^{-1} function ..." << std::flush;
+        std::cout << "(4/5) Building predecessor R_c, R_c^R and Phi/Phi^{-1}/Phi_R/Phi^{-1}_R function ..." << std::flush;
 
         
         samples_last = sdsl::int_vector<>(r,0,log_n);
@@ -332,7 +332,7 @@ public:
             last_to_runR[i] = samples_last_vecR[i].second;
         }
 
-
+        std::cout << " done.\n(5/5) Building bitvectors for contraction shortcut S_l, E_l, S_l^R, E_l^R (l<=bl) ..." << std::flush;
 
         // construct kmer_start, kmer_end
         kmer_start = {};
@@ -679,6 +679,15 @@ public:
                         0,            // offset 0
                         0);           // null pattern
 
+    }
+
+    inline br_sample get_invalid_sample()
+    {
+            return br_sample({1,0},   // empty SA range
+                        {1,0},        // empty SAR range
+                        0,            // arbitrary sample
+                        0,            // offset 0
+                        0);           // null pattern
     }
 
     /*
@@ -1287,6 +1296,47 @@ public:
         return locate_sample(sample);
     }
 
+    // gets MEMs
+    void maximal_exact_match(std::string const& pattern)
+    {
+        ulint m = pattern.size();
+        ulint j = 0, l = 0, max_l = 0;
+        bool extended = false;
+
+        br_sample sample(get_initial_sample());
+
+        for (ulint i = 0; i < m; ++i)
+        {
+            while (j < m)
+            {
+                br_sample new_sample = right_extension((uchar)pattern[j],sample);
+                if (new_sample.is_invalid()) break;
+                extended = true;
+                sample = new_sample;
+                l++;
+                j++;
+            }
+            if (extended)
+            {
+                std::cout << "Maximal substring starting from position: " << i << " length: "<< l << std::endl;
+            }
+            
+            if (i == j)
+            {
+                sample = get_initial_sample();
+                j++;
+                l = 0;
+            }
+            else 
+            {
+                sample = left_contraction(sample);
+                l--;
+            }
+            extended = false;
+        }
+
+    }
+
 
     /*
      * get BWT[i] or BWT^R[i]
@@ -1582,7 +1632,7 @@ public:
         tot_bytes += bytes;
         std::cout << "last_to_runR: " << bytes << " bytes" << std::endl;
 
-
+        std::cout << "(parameter bl: " << length << ")" << std::endl;
         std::cout << "kmer_start, kmer_end, kmer_startR, kmer_endR: ";
         ulint kmer_bytes = 0;
         for (ulint k = 0; k < fix; ++k)
