@@ -3,28 +3,29 @@
 #include <fstream>
 #include <string>
 
-#include "../src/br_index.hpp"
+#include "../src/br_index_full.hpp"
 
 using namespace bri;
+using namespace std;
 
-template<class T>
-void print_vec(std::vector<T>& vec)
+template<class T, class U>
+bool equal_set(vector<T>& v1, vector<U>& v2)
 {
-    for (size_t i = 0; i < vec.size(); ++i)
-        std::cout << vec[i] << " ";
-    std::cout << std::endl;
-}
+    if (v1.size() != v2.size()) return false;
+    std::sort(v1.begin(),v1.end());
+    std::sort(v2.begin(),v2.end());
+    for (size_t i = 0; i < v1.size(); ++i)
+    {
+        if (v1[i] != v2[i]) return false;
+    }
+    return true;
 
-void print_range(range_t rg)
-{
-    std::cout << "1st val: " << rg.first <<
-    " 2nd val: " << rg.second << std::endl;
 }
 
 IUTEST(BrIndexTest, BasicLocate)
 {
     std::string s("aaaaaaaaaaaaaaaaaaaa");
-    br_index<> idx(s);
+    br_index_full<> idx(s,1);
     IUTEST_ASSERT_EQ(20,idx.text_size());
     IUTEST_ASSERT_EQ(21,idx.bwt_size());
     range_t range = idx.full_range();
@@ -47,26 +48,13 @@ IUTEST(BrIndexTest, BasicLocate)
         IUTEST_ASSERT_EQ(i,res[i]);
     }
 
-    res = idx.locate("aa",false);
-    IUTEST_ASSERT_EQ(19,res.size());
-    std::sort(res.begin(),res.end());
-    for (ulint i = 0; i < res.size(); ++i)
-    {
-        IUTEST_ASSERT_EQ(i,res[i]);
-    }
 }
 
 IUTEST(BrIndexTest, PeriodicTextLocate)
 {
     std::string s("abcdabcdabcdabcdhello");
-    br_index<> idx(s);
+    br_index_full<> idx(s,1);
     auto vec = idx.locate("abcd");
-    std::sort(vec.begin(),vec.end());
-    IUTEST_ASSERT_EQ(0,vec[0]);
-    IUTEST_ASSERT_EQ(4,vec[1]);
-    IUTEST_ASSERT_EQ(8,vec[2]);
-    IUTEST_ASSERT_EQ(12,vec[3]);
-    vec = idx.locate("abcd",false);
     std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
     IUTEST_ASSERT_EQ(4,vec[1]);
@@ -78,7 +66,7 @@ IUTEST(BrIndexTest, PeriodicTextLocate)
 IUTEST(BrIndexTest, PhiPhiI)
 {
     std::string s("abcdabcdabcdabcdhello");
-    br_index<> idx(s);
+    br_index_full<> idx(s,1);
     IUTEST_EXPECT_EQ(21,idx.Phi(0));
     IUTEST_EXPECT_EQ(0,idx.Phi(4));
     IUTEST_EXPECT_EQ(4,idx.Phi(8));
@@ -116,11 +104,10 @@ IUTEST(BrIndexTest, PhiPhiI)
 IUTEST(BrIndexTest, DNALikeTextLocate)
 {
     std::string s("AAAATGCCGCCGCCATAAA");
-    br_index<> idx(s);
+    br_index_full<> idx(s,1);
 
     auto vec = idx.locate("C");
     std::sort(vec.begin(),vec.end());
-    print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
     IUTEST_EXPECT_EQ(7,vec[1]);
     IUTEST_EXPECT_EQ(9,vec[2]);
@@ -130,30 +117,64 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
 
     vec = idx.locate("CC");
     std::sort(vec.begin(),vec.end());
-    print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
     IUTEST_EXPECT_EQ(9,vec[1]);
     IUTEST_EXPECT_EQ(12,vec[2]);
-
-    vec = idx.locate("CC",false);
-    std::sort(vec.begin(),vec.end());
-    print_vec<>(vec);
-    IUTEST_EXPECT_EQ(6,vec[0]);
-    IUTEST_EXPECT_EQ(9,vec[1]);
-    IUTEST_EXPECT_EQ(12,vec[2]);
-
 
     vec = idx.locate("GCC");
     std::sort(vec.begin(),vec.end());
-    print_vec<>(vec);
     IUTEST_EXPECT_EQ(5,vec[0]);
     IUTEST_EXPECT_EQ(8,vec[1]);
     IUTEST_EXPECT_EQ(11,vec[2]);
+}
 
-    vec = idx.locate("GCC",false);
-    std::sort(vec.begin(),vec.end());
-    print_vec<>(vec);
-    IUTEST_EXPECT_EQ(5,vec[0]);
-    IUTEST_EXPECT_EQ(8,vec[1]);
-    IUTEST_EXPECT_EQ(11,vec[2]);
+IUTEST(BrIndexTest, ExtensionContraction)
+{
+    string input("abracadabra");
+    br_index_full<> idx(input,1,false);
+    auto init = idx.get_initial_sample();
+    auto s = init;
+
+    s = idx.left_extension('a',init);
+    {
+        vector<ulint> exp{0,3,5,7,10};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.left_extension('r',s);
+    {
+        vector<ulint> exp{2,9};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.left_contraction(s);
+    {
+        vector<ulint> exp{0,3,5,7,10};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.left_contraction(s);
+    IUTEST_EXPECT_EQ(12,s.size());
+
+    s = idx.right_extension('r',init);
+    {
+        vector<ulint> exp{2,9};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.right_extension('a',s);
+    {
+        vector<ulint> exp{2,9};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.right_contraction(s);
+    {
+        vector<ulint> exp{2,9};
+        vector<ulint> loc(idx.locate_sample(s));
+        IUTEST_ASSERT(equal_set<>(exp,loc));
+    }
+    s = idx.right_contraction(s);
+    IUTEST_EXPECT_EQ(12,s.size());
+    
 }
