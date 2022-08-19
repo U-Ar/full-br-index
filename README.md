@@ -50,7 +50,6 @@ Also, you can run unit tests by
 ```bash
 make test-bri
 ```
-Unit tests are incomplete since they are just taken from https://github.com/U-Ar/br-index.
 
 The codes used for experiments are archived in the _experiment\_archive_ directory. 
 

@@ -836,6 +836,8 @@ public:
         br_sample sample(prev_sample);
         assert(sample.len >= 1);
 
+        if (sample.len == 1) return get_initial_sample();
+
         // get Psi(s), Psi(e)
         ulint psi_s = FL(sample.range.first);
         ulint psi_e = FL(sample.range.second);
@@ -914,6 +916,8 @@ public:
     {
         br_sample sample(prev_sample);
         assert(sample.len >= 1);
+
+        if (sample.len == 1) return get_initial_sample();
 
         // get PsiR(sR), Psi(eR)
         ulint psiR_sR = FLR(sample.rangeR.first);

@@ -42,6 +42,7 @@ add_executable(run_tests test/run_tests.cpp
 	test/huffman_string_test.cpp
 	test/rle_string_test.cpp
 	test/permuted_lcp_test.cpp
+	test/br_index_test.cpp
 )
 target_link_libraries(run_tests PRIVATE sdsl divsufsort divsufsort64)
 

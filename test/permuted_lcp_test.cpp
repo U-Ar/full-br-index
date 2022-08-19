@@ -25,6 +25,7 @@ IUTEST(PermutedLcpTest, Construction)
 
     construct_sa<8>(cc);
     construct_isa(cc);
+    construct_lcp_kasai<8>(cc);
 
     permuted_lcp<> plcp(cc);
 
@@ -48,6 +49,7 @@ IUTEST(PermutedLcpTest, A10TextOperations)
 
     construct_sa<8>(cc);
     construct_isa(cc);
+    construct_lcp_kasai<8>(cc);
 
     permuted_lcp<> plcp(cc);
     IUTEST_ASSERT_EQ(11,plcp.size());
@@ -107,6 +109,7 @@ IUTEST(PermutedLcpTest, TwoCharTextOperations)
 
     construct_sa<8>(cc);
     construct_isa(cc);
+    construct_lcp_kasai<8>(cc);
 
     permuted_lcp<> plcp(cc);
     IUTEST_ASSERT_EQ(16,plcp.size());
@@ -178,6 +181,7 @@ IUTEST(PermutedLcpTest, A1000000TextOperations)
 
     construct_sa<8>(cc);
     construct_isa(cc);
+    construct_lcp_kasai<8>(cc);
 
     permuted_lcp<> plcp(cc);
     IUTEST_ASSERT_EQ(1000001,plcp.size());
