@@ -9,6 +9,7 @@ using namespace bri;
 using namespace std;
 
 string check = string();
+long length = 0;
 
 void help()
 {
@@ -16,7 +17,9 @@ void help()
 
 	cout << "Usage: bri-mem [options] <index> <pattern>" << endl;
 	cout << "   (not yet implemented) -c <text>    check correctness of each pattern occurrence on this text file" << endl;
-	cout << "   <index>      index file (with extension .brif)" << endl;
+	cout << "   -bl <length>         parameter (index file's specification by default)" << endl;
+    cout << "                        For contractions of the patterns shorter than <length>, " << endl;
+    cout << "                        shortcut is applied." << endl;cout << "   <index>      index file (with extension .brif)" << endl;
 	cout << "   <pattern>    text file of the pattern you want to search for substrings" << endl;
 
 	exit(0);
@@ -40,6 +43,23 @@ void parse_args(char** argv, int argc, int &ptr){
 		check = string(argv[ptr]);
 		ptr++;
     
+    }
+    else if (s.compare("-bl") == 0)
+    {
+        if(ptr >= argc-1){
+			cout << "Error: missing parameter after -bl option." << endl;
+			help();
+		}
+
+		char* e;
+        length = strtol(argv[ptr],&e,10);
+
+        if(*e != '\0' || length <= 0){
+            cout << "Error: illegal or nonpositive value after -bl option." << endl;
+            help();
+        }
+
+		ptr++;
     }
     else
     {
@@ -79,7 +99,8 @@ void locate_all(ifstream& in, string pattern_file)
 
     T idx;
 
-    idx.load(in);
+    if (length) idx.load(in,(int)length);
+    else idx.load(in);
 
     auto t2 = high_resolution_clock::now();
 

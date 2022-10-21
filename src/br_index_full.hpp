@@ -1508,6 +1508,68 @@ public:
 
     }
 
+    void load(std::istream& in, int bl)
+    {
+
+        in.read((char*)&sigma,sizeof(sigma));
+        in.read((char*)&length,sizeof(length));
+
+        remap = std::vector<uchar>(256);
+        in.read((char*)remap.data(),256*sizeof(uchar));
+        remap_inv = std::vector<uchar>(256);
+        in.read((char*)remap_inv.data(),256*sizeof(uchar));
+        
+        in.read((char*)&terminator_position,sizeof(terminator_position));
+        in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
+        in.read((char*)&last_SA_val,sizeof(last_SA_val));
+        
+        F = std::vector<ulint>(256);
+        in.read((char*)F.data(),256*sizeof(ulint));
+
+        bwt.load(in);
+        bwtR.load(in);
+        r = bwt.number_of_runs();
+        rR = bwtR.number_of_runs();
+
+        samples_first.load(in);
+        samples_last.load(in);
+
+        first.load(in);
+        first_to_run.load(in);
+
+        last.load(in);
+        last_to_run.load(in);
+
+        samples_firstR.load(in);
+        samples_lastR.load(in);
+
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+
+        kmer_start.resize(length);
+        kmer_end.resize(length);
+        kmer_startR.resize(length);
+        kmer_endR.resize(length);
+        for (ulint k = 0; k < length; ++k)
+        {
+            kmer_start[k].load(in);
+            kmer_end[k].load(in);
+
+            kmer_startR[k].load(in);
+            kmer_endR[k].load(in);
+        }
+
+        if (bl > length) std::cout << "Warning: bl you gave to br_index_full::load is illegal, index default is used." << std::endl;
+        else length = bl;
+
+        plcp.load(in);
+        plcpR.load(in);
+
+    }
+
     /*
      * save index to "{path_prefix}.brif" file
      */
