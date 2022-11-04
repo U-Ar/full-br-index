@@ -1,8 +1,28 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 PROJECT(full-br-index CXX)
 
 FIND_PACKAGE(Git QUIET)
+
+
+# copy & build using external makefile for pfpbuilder
+FILE(COPY "${CMAKE_SOURCE_DIR}/src/pfpbuilder" DESTINATION "${CMAKE_BINARY_DIR}")
+IF(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h)
+    message(FATAL_ERROR "File \"${CMAKE_CURRENT_BINARY_DIR}/__nothing.h\" found, \
+    this should never be created, remove!")
+ENDIF()
+ADD_CUSTOM_TARGET(
+    my_custom_target_that_always_runs ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h
+)
+ADD_CUSTOM_COMMAND(
+    OUTPUT
+        ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h  # fake! ensure we run!
+	COMMAND make 
+	WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/pfpbuilder"
+	COMMENT "Build external PFPbuilder source."
+)
+
 
 SET(SDSL_INCLUDE "~/sdsl/include") #SDSL headeres
 SET(SDSL_LIB "~/sdsl/lib") #SDSL lib
