@@ -12,7 +12,7 @@ IF(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h)
     this should never be created, remove!")
 ENDIF()
 ADD_CUSTOM_TARGET(
-    my_custom_target_that_always_runs ALL
+    PFP_builder_source ALL
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h
 )
 ADD_CUSTOM_COMMAND(

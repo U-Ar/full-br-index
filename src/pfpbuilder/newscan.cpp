@@ -180,6 +180,7 @@ struct Args {
    bool compress = false; // parsing called in compress mode 
    int th=0;              // number of helper threads
    int verbose=0;         // verbosity level 
+   bool reverse=0;        // direction of file read
 };
 
 
@@ -235,6 +236,67 @@ struct KR_window {
 
 };
 // -----------------------------------------------------------
+
+
+// -----------------------------------------------------------------
+// class to read file backwards efficiently
+struct backward_ifstream {
+  static const long buff_size = 4096;
+  int buff[buff_size];
+  long cur;
+
+  ifstream f;
+  long pos;
+
+  backward_ifstream(ifstream&& ifs) {
+    f = std::move(ifs);
+
+    pos = f.tellg();
+    if (pos < buff_size - 1) {
+      f.seekg(0);
+      for (long p = 0; p <= pos; ++p) {
+        buff[p] = f.get();
+      }
+      cur = pos;
+    } else {
+      f.seekg(-(buff_size-1),ios::cur);
+      for (long p = 0; p < buff_size; ++p) {
+        buff[p] = f.get();
+      }
+      cur = buff_size-1;
+    }
+  }
+
+  ~backward_ifstream() { f.close(); }
+
+  void close() { f.close(); }
+
+  int get() {
+    if (pos < 0) return EOF;
+
+    int res = buff[cur]; pos--;
+
+    if (cur == 0) {
+      if (pos < buff_size - 1) {
+        f.seekg(0);
+        for (long p = 0; p <= pos; ++p) {
+          buff[p] = f.get();
+        }
+        cur = pos;
+      } else {
+        f.seekg(pos-(buff_size-1));
+        for (long p = 0; p < buff_size; ++p) {
+          buff[p] = f.get();
+        }
+        cur = buff_size-1;
+      }
+    } else {
+      cur--;
+    }
+    return res;
+  }
+};
+
 
 static void save_update_word(Args& arg, string& w, map<uint64_t,word_stats>&  freq, FILE *tmp_parse_file, FILE *last, FILE *sa, uint64_t &pos);
 
@@ -385,6 +447,77 @@ uint64_t process_file(Args& arg, map<uint64_t,word_stats>& wordFreq)
   return krw.tot_char;
 }
 
+uint64_t process_file_reverse(Args& arg, map<uint64_t,word_stats>& wordFreq)
+{
+  //open a, possibly compressed, input file
+  string fnam = arg.inputFileName;
+  #ifdef GZSTREAM 
+  igzstream f(fnam.c_str(), std::ifstream::ate);
+  #else
+  ifstream f(fnam, std::ifstream::ate);
+  #endif    
+  if(!f.rdbuf()->is_open()) {// is_open does not work on igzstreams 
+    perror(__func__);
+    throw new std::runtime_error("Cannot open input file " + fnam);
+  }
+
+  long size = f.tellg();
+  f.seekg(size-1);
+
+  string revFileName = arg.inputFileName + ".rev";
+
+  // open the 1st pass parsing file 
+  FILE *g = open_aux_file(revFileName.c_str(),EXTPARS0,"wb");
+  FILE *sa_file = NULL, *last_file=NULL;
+  if(!arg.compress) {
+    // open output file containing the char at position -(w+1) of each word
+    last_file = open_aux_file(revFileName.c_str(),EXTLST,"wb");  
+    // if requested open file containing the ending position+1 of each word
+    if(arg.SAinfo) 
+      sa_file = open_aux_file(revFileName.c_str(),EXTSAI,"wb");
+  }
+  
+  
+  // main loop on the chars of the input file
+  backward_ifstream bf(std::move(f));
+  int c;
+  uint64_t pos = 0; // ending position +1 of previous word in the original text, used for computing sa_info
+  assert(IBYTES<=sizeof(pos)); // IBYTES bytes of pos are written to the sa info file 
+  // init first word in the parsing with a Dollar char unless we are just compressing
+  string word("");
+  if(!arg.compress) word.append(1,Dollar);
+  // init empty KR window: constructor only needs window size
+  KR_window krw(arg.w);
+  // while( (c = f.get()) != EOF ) {
+  while((c=bf.get()) != EOF) {
+    if(c<=Dollar && !arg.compress) {
+      // if we are not simply compressing then we cannot accept 0,1,or 2
+      cerr << "Invalid char found in input file. Exiting...\n"; exit(1);
+    }
+    word.append(1,c);
+    uint64_t hash = krw.addchar(c);
+    if(hash%arg.p==0) {
+      // end of word, save it and write its full hash to the output file
+      // cerr << "~"<< c << "~ " << hash << " ~~ <" << word << "> ~~ <" << krw.get_window() << ">" <<  endl;
+      save_update_word(arg,word,wordFreq,g,last_file,sa_file,pos);
+    }  
+  }
+  // virtually add w null chars at the end of the file and add the last word in the dict
+  word.append(arg.w,Dollar);
+  save_update_word(arg,word,wordFreq,g,last_file,sa_file,pos);
+  // close input and output files 
+  if(sa_file) if(fclose(sa_file)!=0) die("Error closing SA file");
+  if(last_file) if(fclose(last_file)!=0) die("Error closing last file");  
+  if(fclose(g)!=0) die("Error closing parse file");
+  if(arg.compress)
+    assert(pos==krw.tot_char);
+  else 
+    assert(pos==krw.tot_char+arg.w);
+  // if(pos!=krw.tot_char+arg.w) cerr << "Pos: " << pos << " tot " << krw.tot_char << endl;
+  bf.close();
+  return krw.tot_char;
+}
+
 // function used to compare two string pointers
 bool pstringCompare(const string *a, const string *b)
 {
@@ -477,7 +610,8 @@ void print_help(char** argv, Args &args) {
         #endif        
         << "\t-c  \tdiscard redundant information" << endl
         << "\t-h  \tshow help and exit" << endl
-        << "\t-s  \tcompute suffix array info" << endl;
+        << "\t-s  \tcompute suffix array info" << endl
+        << "\t-r  \tread file in reversed order" << endl;
   #ifdef GZSTREAM
   cout << "If the input file is gzipped it is automatically extracted\n";
   #endif
@@ -495,12 +629,14 @@ void parseArgs( int argc, char** argv, Args& arg ) {
   puts("");
 
    string sarg;
-   while ((c = getopt( argc, argv, "p:w:sht:vc") ) != -1) {
+   while ((c = getopt( argc, argv, "p:w:sht:vcr") ) != -1) {
       switch(c) {
         case 's':
         arg.SAinfo = true; break;
         case 'c':
         arg.compress = true; break;
+        case 'r':
+        arg.reverse = true; break;
         case 'w':
         sarg.assign( optarg );
         arg.w = stoi( sarg ); break;
@@ -559,6 +695,9 @@ int main(int argc, char** argv)
   cout << "Windows size: " << arg.w << endl;
   cout << "Stop word modulus: " << arg.p << endl;  
 
+  if (!arg.reverse) cout << "Flag -r is false. Parse in the forward direction." << endl;
+  else cout << "Flag -r is true. Parse in the backward direction." << endl;
+
   // measure elapsed wall clock time
   time_t start_main = time(NULL);
   time_t start_wc = start_main;  
@@ -569,8 +708,11 @@ int main(int argc, char** argv)
   // ------------ parsing input file 
   try {
       if(arg.th==0)
-        totChar = process_file(arg,wordFreq);
+        if (!arg.reverse) totChar = process_file(arg,wordFreq);
+        else totChar = process_file_reverse(arg,wordFreq);
       else {
+        // NOTE: now newscan.cpp is used only for single threaded parsing, so mt_process_file_reverse is not implemented so far.
+        //       pscan.cpp supports multi-threaded parsing for the reversed direction.
         #ifdef NOTHREADS
         cerr << "Sorry, this is the no-threads executable and you requested " << arg.th << " threads\n";
         exit(EXIT_FAILURE);
@@ -583,6 +725,11 @@ int main(int argc, char** argv)
       cout << "Out of memory (parsing phase)... emergency exit\n";
       die("bad alloc exception");
   }
+
+  // after 1st parsing original text is not required
+  // add .rev by default
+  if (arg.reverse) arg.inputFileName += ".rev";
+
   // first report 
   uint64_t totDWord = wordFreq.size();
   cout << "Total input symbols: " << totChar << endl;
@@ -624,7 +771,8 @@ int main(int argc, char** argv)
   cout << "Generating remapped parse file\n";
   remapParse(arg, wordFreq);
   cout << "Remapping parse file took: " << difftime(time(NULL),start_wc) << " wall clock seconds\n";  
-  cout << "==== Elapsed time: " << difftime(time(NULL),start_main) << " wall clock seconds\n";        
+  cout << "==== Elapsed time: " << difftime(time(NULL),start_main) << " wall clock seconds\n";      
+  
   return 0;
 }
 

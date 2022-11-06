@@ -46,12 +46,16 @@ def main():
   parser.add_argument('-k',  help='keep temporary files',action='store_true')
   parser.add_argument('-v',  help='verbose',action='store_true')
   parser.add_argument('-c',  help='check BWT using SACA-K',action='store_true')
+  parser.add_argument('-r',  help='read input file in the reversed order',action='store_true')
   parser.add_argument('--sum', help='compute output files sha256sum',action='store_true')
   parser.add_argument('--parsing',  help='stop after the parsing phase (debug only)',action='store_true')
   parser.add_argument('--compress',  help='compress output of the parsing phase (debug only)',action='store_true')
   args = parser.parse_args()
-  if(args.S and (args.s or args.e)):
+  if args.S and (args.s or args.e) :
     print("You can either compute the full SA or a sample of it, not both. Exiting...")
+    return
+  if args.r and args.c:
+    print("You cannot check the reversed BWT since reversed SACAK is not implemented.")
     return
     
   logfile_name = args.input + ".log"
@@ -60,19 +64,29 @@ def main():
     
     # ---------- parsing of the input file 
     start0 = start = time.time()
+    command = ""
+
     if args.t>0:
       command = "{exe} {file} -w {wsize} -p {modulus} -t {th}".format(exe = parse_exe,
               wsize=args.wsize, modulus = args.mod, th=args.t, file=args.input)
     else:
       command = "{exe} {file} -w {wsize} -p {modulus}".format(exe = parseNT_exe,
               wsize=args.wsize, modulus = args.mod, file=args.input)
+
     if (args.s or args.e or args.S): command += " -s"
     if args.v: command += " -v"
     if args.parsing or args.compress: command += " -c"
+    if args.r: command += " -r" # reversed parsing
     print("==== Parsing. Command:", command)
     if(execute_command(command,logfile,logfile_name)!=True):
       return
     print("Elapsed time: {0:.4f}".format(time.time()-start))
+
+    # after parsing original text is not required
+    # add .rev to filename by default for reversed parsing
+    if args.r:
+      args.input += ".rev"
+
     if args.parsing:
       # delete temporary parsing files 
       command = "rm -f {file}.parse_old {file}.last {file}.occ".format(file=args.input)

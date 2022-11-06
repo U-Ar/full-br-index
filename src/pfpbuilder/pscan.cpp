@@ -77,6 +77,7 @@ struct Args {
    int p = 100;           // modulus for establishing stopping w-tuples 
    bool SAinfo = false;   // compute SA information
    bool compress = false; // parsing called in compress mode 
+   bool reverse = false;  // read and parse file in reversed order
    int th=4;              // number of helper threads
    int verbose=0;         // verbosity level
    FILE *tmp_parse_file, *last_file, *sa_file; 
@@ -155,7 +156,64 @@ void MTmaps::update(uint64_t hash, string &w)
 }
 
 
+// -----------------------------------------------------------------
+// class to read file backwards efficiently
+struct backward_ifstream {
+  static const long buff_size = 4096;
+  int buff[buff_size];
+  long cur;
 
+  ifstream f;
+  long pos;
+
+  backward_ifstream(ifstream&& ifs) {
+    f = std::move(ifs);
+
+    pos = f.tellg();
+    if (pos < buff_size - 1) {
+      f.seekg(0);
+      for (long p = 0; p <= pos; ++p) {
+        buff[p] = f.get();
+      }
+      cur = pos;
+    } else {
+      f.seekg(-(buff_size-1),ios::cur);
+      for (long p = 0; p < buff_size; ++p) {
+        buff[p] = f.get();
+      }
+      cur = buff_size-1;
+    }
+  }
+
+  ~backward_ifstream() { f.close(); }
+
+  void close() { f.close(); }
+
+  int get() {
+    if (pos < 0) return EOF;
+
+    int res = buff[cur]; pos--;
+
+    if (cur == 0) {
+      if (pos < buff_size - 1) {
+        f.seekg(0);
+        for (long p = 0; p <= pos; ++p) {
+          buff[p] = f.get();
+        }
+        cur = pos;
+      } else {
+        f.seekg(pos-(buff_size-1));
+        for (long p = 0; p < buff_size; ++p) {
+          buff[p] = f.get();
+        }
+        cur = buff_size-1;
+      }
+    } else {
+      cur--;
+    }
+    return res;
+  }
+};
 
 
 // -----------------------------------------------------------------
@@ -323,7 +381,8 @@ void print_help(char** argv, Args &args) {
         << "\t-t M\tnumber of helper threads, def. 4 " << endl
         << "\t-c  \tdiscard redundant information" << endl
         << "\t-h  \tshow help and exit" << endl
-        << "\t-s  \tcompute suffix array info" << endl;
+        << "\t-s  \tcompute suffix array info" << endl
+        << "\t-r  \tread file in reversed order" << endl;
   exit(1);
 }
 
@@ -338,12 +397,14 @@ void parseArgs( int argc, char** argv, Args& arg ) {
   puts("");
 
    string sarg;
-   while ((c = getopt( argc, argv, "p:w:sht:vc") ) != -1) {
+   while ((c = getopt( argc, argv, "p:w:sht:vcr") ) != -1) {
       switch(c) {
         case 's':
         arg.SAinfo = true; break;
         case 'c':
         arg.compress = true; break;
+        case 'r':
+        arg.reverse = true; break;
         case 'w':
         sarg.assign( optarg );
         arg.w = stoi( sarg ); break;
@@ -398,7 +459,10 @@ int main(int argc, char** argv)
   parseArgs(argc, argv, arg);
   cout << "Windows size: " << arg.w << endl;
   cout << "Stop word modulus: " << arg.p << endl;  
-  
+
+  if (!arg.reverse) cout << "Flag -r is false. Parse in the forward direction." << endl;
+  else cout << "Flag -r is true. Parse in the backward direction." << endl;
+
   // measure elapsed wall clock time
   time_t start_main = time(NULL);
   time_t start_wc = start_main;
@@ -414,6 +478,11 @@ int main(int argc, char** argv)
       cout << "Out of memory (parsing phase)... emergency exit\n";
       die("bad alloc exception");
   }
+
+  // after 1st parsing original text is not required
+  // add .rev by default
+  if (arg.reverse) arg.inputFileName += ".rev";
+
   // first report 
   uint64_t totDWord = mtmaps.size();
   cout << "Total input symbols: " << totChar << endl;
@@ -434,7 +503,7 @@ int main(int argc, char** argv)
   // fill array
   uint64_t sumLen = 0;
   uint64_t totWord = 0;
-  
+
   // copy words from all maps to the dictionary
   for(auto& wordFreq: mtmaps.maps) {
     for(auto& x: wordFreq) {
@@ -459,7 +528,9 @@ int main(int argc, char** argv)
   start_wc = time(NULL);
   cout << "Generating remapped parse file\n";
   remapParse(arg, mtmaps);
-  cout << "Remapping parse file took: " << difftime(time(NULL),start_wc) << " wall clock seconds\n";  
-  cout << "==== Elapsed time: " << difftime(time(NULL),start_main) << " wall clock seconds\n";        
+  cout << "Remapping parse file took: " << difftime(time(NULL),start_wc) << " wall clock seconds\n";
+
+  cout << "==== Elapsed time: " << difftime(time(NULL),start_main) << " wall clock seconds\n";
+
   return 0;
 }
