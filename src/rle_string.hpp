@@ -350,6 +350,16 @@ public:
 
     }
 
+    // load from plain text bwt file
+    void load_from_plain(std::ifstream& in, ulint size, ulint B=2) {
+        this->B=B;
+    }
+
+    // load from plain text bwt file using remapper
+    void load_from_plain(std::ifstream& in, ulint size, std::vector<uchar> const& remap, ulint B=2) {
+        this->B=B;
+    }
+
     std::string to_string()
     {
         
