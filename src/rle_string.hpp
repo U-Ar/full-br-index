@@ -353,11 +353,94 @@ public:
     // load from plain text bwt file
     void load_from_plain(std::ifstream& in, ulint size, ulint B=2) {
         this->B=B;
+        n = size;
+        r = 0;
+
+        auto runs_per_letter_pos = std::vector<std::vector<ulint>>(256);
+        auto freqs = std::vector<ulint>(256,0);
+        std::vector<ulint> runs_pos;
+        std::string run_heads_s;
+
+        uchar last_c = in.get();
+
+        for (ulint i = 1; i < size; ++i) {
+            uchar c = in.get();
+            if (c != last_c) {
+                run_heads_s.push_back(last_c);
+                runs_per_letter_pos[last_c].push_back(freqs[last_c]);
+
+                last_c = c;
+                freqs[c]++;
+
+                if (r%B==B-1) runs_pos.push_back(i-1); //run end (only at the end of a block)
+
+                r++;
+            } else {
+                freqs[last_c]++;
+            }
+        }
+
+        // huffman-encoding BWT run heads
+        run_heads_s.push_back(last_c);
+        assert(run_heads_s.size()==r);
+        run_heads = string_t(run_heads_s);
+        assert(run_heads.size()==r);
+
+        // initializa sd_vector with iterator on position vector
+        runs_per_letter_pos[last_c].push_back(freqs[last_c]);
+        runs_per_letter = std::vector<sparse_bitvector_t>(256);
+        for (ulint i = 0; i < 256; ++i) {
+            runs_per_letter[i] = sparse_bitvector_t(runs_per_letter_pos[i].cbegin(),runs_per_letter_pos[i].cend());
+        }
+        runs = sparse_bitvector_t(runs_pos.cbegin(),runs_pos.cend());
     }
 
-    // load from plain text bwt file using remapper
+    // load from plain text bwt file using alphabet remapper
     void load_from_plain(std::ifstream& in, ulint size, std::vector<uchar> const& remap, ulint B=2) {
         this->B=B;
+        n = size;
+        r = 0;
+
+        auto runs_per_letter_pos = std::vector<std::vector<ulint>>(256);
+        auto freqs = std::vector<ulint>(256,0);
+        std::vector<ulint> runs_pos;
+        std::string run_heads_s;
+
+        uchar last_c = remap[in.get()];
+
+        for (ulint i = 1; i < size; ++i) {
+            uchar c = remap[in.get()];
+            if (c != last_c) {
+                run_heads_s.push_back(last_c);
+                runs_per_letter_pos[last_c].push_back(freqs[last_c]);
+
+                last_c = c;
+                freqs[c]++;
+
+                if (r%B==B-1) runs_pos.push_back(i-1); //run end (only at the end of a block)
+
+                r++;
+            } else {
+                freqs[last_c]++;
+            }
+        }
+
+        assert(in.get()==EOF);
+
+        // huffman-encoding BWT run heads
+        run_heads_s.push_back(last_c);
+        assert(run_heads_s.size()==r);
+        run_heads = string_t(run_heads_s);
+        assert(run_heads.size()==r);
+
+        // initializa sd_vector with iterator on position vector
+        runs_per_letter_pos[last_c].push_back(freqs[last_c]);
+        runs_per_letter = std::vector<sparse_bitvector_t>(256);
+        for (ulint i = 0; i < 256; ++i) {
+            runs_per_letter[i] = sparse_bitvector_t(runs_per_letter_pos[i].cbegin(),runs_per_letter_pos[i].cend());
+        }
+        runs = sparse_bitvector_t(runs_pos.cbegin(),runs_pos.cend());
+
     }
 
     std::string to_string()

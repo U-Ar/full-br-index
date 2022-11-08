@@ -64,6 +64,7 @@ public:
         // build RLBWT with remapper
         fbwt.seekg(0);
         idx.bwt.load_from_plain(fbwt,size,idx.remap);
+        fbwt.close();
 
         // read .ssa & .esa
         FILE* file_ssa = open_aux_file(arg.input_file,EXTSSA,"rb");
@@ -73,6 +74,17 @@ public:
 
         // load from reversed files
         std::string input_rev = input + ".rev";
+
+        // read .rev.bwt
+        std::ifstream fbwt_rev(input_rev + ".bwt");
+        if (!fbwt_rev.is_open()) {
+            perror(__func__);
+            throw new std::runtime_error("Cannot open file " + input_rev + ".bwt");
+        }
+
+        // build RLBWT^R with remapper
+        idx.bwtR.load_from_plain(fbwt_rev,size,idx.remap);
+        fbwt_rev.close();
 
 
 

@@ -19,12 +19,13 @@ namespace bri {
 
 class sparse_sd_vector{
 public:
+    
 
     /*
      * empty contructor. all bits are 0
      */
-    sparse_sd_vector(bool enable_rank=true, bool enable_select=true) :
-        rank_enabled(enable_rank), select_enabled(enable_select)
+    sparse_sd_vector() :
+        rank_enabled(true), select_enabled(true)
     {}
 
     /*
@@ -62,6 +63,20 @@ public:
         if (rank_enabled) rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
         if (select_enabled) select1 = sdsl::sd_vector<>::select_1_type(&sdv);
     }
+
+    /*
+     * constructor. build from sd_vector_builder
+     */
+    template<class itr_t>
+    sparse_sd_vector(const itr_t begin, const itr_t end) {
+        sdv = sdsl::sd_vector<>(begin,end);
+        rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
+        select1 = sdsl::sd_vector<>::select_1_type(&sdv);
+
+        u = sdv.size();
+    }
+
+
 
     /*
      * substitution operator.
