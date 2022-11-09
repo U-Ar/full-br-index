@@ -3,11 +3,6 @@
  * author: Yuma Arakawa
  */
 
-#include "definitions.hpp"
-#include "rle_string.hpp"
-#include "sparse_sd_vector.hpp"
-#include "permuted_lcp.hpp"
-#include "utils.hpp"
 #include "br_index.hpp"
 
 namespace bri {
@@ -23,7 +18,7 @@ br_index::br_index() {}
 * not suitable for texts of some gigabytes.
 * use Prefix-Free Parsing builder instead. (pfpbuild.cpp)
 */
-br_index::br_index(std::string const& input, ulint length=8, bool sais = true) {
+br_index::br_index(std::string const& input, ulint length, bool sais) {
     assert(length > 0);
     this->length = length;
 
@@ -1318,8 +1313,6 @@ ulint br_index::serialize(std::ostream& out)
     out.write((char*)remap.data(),256*sizeof(uchar));
     out.write((char*)remap_inv.data(),256*sizeof(uchar));
 
-    //out.write((char*)&terminator_position,sizeof(terminator_position));
-    //out.write((char*)&terminator_positionR,sizeof(terminator_positionR));
     out.write((char*)&last_SA_val,sizeof(last_SA_val));
     out.write((char*)F.data(),256*sizeof(ulint));
 
@@ -1327,8 +1320,6 @@ ulint br_index::serialize(std::ostream& out)
                 + sizeof(length)
                 + 256*sizeof(uchar)
                 + 256*sizeof(uchar)
-                //+ sizeof(terminator_position)
-                //+ sizeof(terminator_positionR)
                 + sizeof(last_SA_val)
                 + 256*sizeof(ulint);
     
@@ -1359,12 +1350,8 @@ ulint br_index::serialize(std::ostream& out)
     for (ulint k = 0; k < length; ++k)
     {
         w_bytes += kmer[k].serialize(out);
-        //w_bytes += kmer_start[k].serialize(out);
-        //w_bytes += kmer_end[k].serialize(out);
 
         w_bytes += kmerR[k].serialize(out);
-        //w_bytes += kmer_startR[k].serialize(out);
-        //w_bytes += kmer_endR[k].serialize(out);
     }
 
 
@@ -1383,8 +1370,6 @@ void br_index::load(std::istream& in)
     remap_inv = std::vector<uchar>(256);
     in.read((char*)remap_inv.data(),256*sizeof(uchar));
     
-    //in.read((char*)&terminator_position,sizeof(terminator_position));
-    //in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
     in.read((char*)&last_SA_val,sizeof(last_SA_val));
     
     F = std::vector<ulint>(256);
@@ -1416,19 +1401,13 @@ void br_index::load(std::istream& in)
     plcp.load(in);
     plcpR.load(in);
 
-    kmer_start.resize(length);
-    kmer_end.resize(length);
-    kmer_startR.resize(length);
-    kmer_endR.resize(length);
+    kmer.resize(length);
+    kmerR.resize(length);
     for (ulint k = 0; k < length; ++k)
     {
         kmer[k].load(in);
-        //kmer_start[k].load(in);
-        //kmer_end[k].load(in);
 
         kmerR[k].load(in);
-        //kmer_startR[k].load(in);
-        //kmer_endR[k].load(in);
     }
 
 }
@@ -1481,10 +1460,8 @@ void br_index::load(std::istream& in, ulint bl)
     plcp.load(in);
     plcpR.load(in);
 
-    kmer_start.resize(length);
-    kmer_end.resize(length);
-    kmer_startR.resize(length);
-    kmer_endR.resize(length);
+    kmer.resize(length);
+    kmerR.resize(length);
     for (ulint k = 0; k < length; ++k)
     {
         kmer[k].load(in);
@@ -1533,8 +1510,6 @@ ulint br_index::print_space(ulint fix)
                     + sizeof(length)
                     + 256*sizeof(uchar)
                     + 256*sizeof(uchar)
-                    //+ sizeof(terminator_position)
-                    //+ sizeof(terminator_positionR)
                     + sizeof(last_SA_val)
                     + 256*sizeof(ulint);
     
@@ -1637,8 +1612,6 @@ ulint br_index::get_space()
                     + sizeof(length)
                     + 256*sizeof(uchar)
                     + 256*sizeof(uchar)
-                    //+ sizeof(terminator_position)
-                    //+ sizeof(terminator_positionR)
                     + sizeof(last_SA_val)
                     + 256*sizeof(ulint);
 
@@ -1672,10 +1645,8 @@ ulint br_index::get_space()
     for (ulint k = 0; k < length; ++k)
     {
         tot_bytes += kmer[k].serialize(out);
-        //tot_bytes += kmer_end[k].serialize(out);
 
         tot_bytes += kmerR[k].serialize(out);
-        //tot_bytes += kmer_endR[k].serialize(out);
     }
 
     return tot_bytes;
@@ -1685,7 +1656,7 @@ ulint br_index::get_space()
 /*
  * get string representation of BWT
  */
-std::string br_index::get_bwt(bool reversed = false)
+std::string br_index::get_bwt(bool reversed)
 {
     if (!reversed)
     {

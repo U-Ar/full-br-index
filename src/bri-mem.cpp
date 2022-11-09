@@ -5,7 +5,6 @@
 #include <cstdlib>
 
 #include "br_index.hpp"
-#include "utils.hpp"
 
 using namespace bri;
 using namespace std;
@@ -180,7 +179,7 @@ int main(int argc, char** argv)
 
     ifstream in(arg.idx_file);
 
-    locate_all<br_index>(arg, in, patt_file);
+    locate_all<br_index>(arg, in, arg.pattern_file);
     
     in.close();
 

@@ -6,14 +6,22 @@
 #ifndef INCLUDED_BR_INDEX_FULL_HPP
 #define INCLUDED_BR_INDEX_FULL_HPP
 
+#include "definitions.hpp"
+#include "rle_string.hpp"
+#include "sparse_sd_vector.hpp"
+#include "permuted_lcp.hpp"
+#include "utils.hpp"
+
 namespace bri {
+
+class br_index_builder;
 
 class br_index {
     
 public:
     using triple = std::tuple<range_t, ulint, ulint>;
     using sparse_bitvector_t = sparse_sd_vector;
-    using rle_string_t = rle_string;
+    using rle_string_t = rle_string<>;
 
     friend br_index_builder;
 
@@ -48,7 +56,7 @@ public:
     br_sample right_extension(br_sample const& prev_sample, uchar c);
     br_sample left_contraction(br_sample const& prev_sample);
     br_sample right_contraction(br_sample const& prev_sample);
-    
+
     br_sample search(std::string const& pattern);
     ulint count_sample(br_sample const& sample);
     ulint count_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples);
