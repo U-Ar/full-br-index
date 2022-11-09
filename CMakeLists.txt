@@ -33,8 +33,8 @@ LINK_DIRECTORIES(${SDSL_LIB})
 SET(CMAKE_CXX_STANDARD 11)
 
 SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -g")
-SET(CMAKE_CXX_FLAGS_RELEASE "-g -ggdb -Ofast -fstrict-aliasing -DNDEBUG -march=native")
-SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -fstrict-aliasing -march=native")
+SET(CMAKE_CXX_FLAGS_RELEASE "-Ofast -DNDEBUG -march=native")
+SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -march=native")
 
 ADD_SUBDIRECTORY(test)
 INCLUDE_DIRECTORIES(src)

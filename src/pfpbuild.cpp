@@ -25,7 +25,7 @@ struct Args {
 class br_index_builder {
     br_index idx;
 public:
-    // input: file basename of Prefix-Free Parsing (.bwt, .ssa, .esa are necessary)
+    // input: file basename of Prefix-Free Parsing (.bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary)
     // bl: parameter
     br_index_builder& build_from_pfp(std::string const& input, int bl) {
         idx = br_index();
@@ -75,7 +75,8 @@ public:
         fbwt.close();
         assert(size==idx.bwt.size());
 
-        r = idx.bwt.number_of_runs();
+        idx.r = idx.bwt.number_of_runs();
+        ulint r = idx.r;
         int log_r = bitsize(r);
         int log_n = bitsize(size);
 
@@ -184,9 +185,21 @@ public:
         }
 
         // consruct kmer_start, kmer_end
+        // 各runの境界につき、その前後を探索する形？
+        // run_range(run_num)でrunの範囲が分かる。そんでそこからSAの値もわかるので、
+        // そこ起点で広げたらいけるのでは？という気がしている
         {
-            fbwt = std::ifstream(input + ".bwt");
+            // first run
+            ulint run_start = 0;
+            ulint run_end = idx.bwt.run_end(0);
+
+            for (ulint i = 0; i < r-1; ++i) {
+                auto run_range = idx.bwt.run_range(i+1);
+                run_start = run_range.first;
+            }
             
+            // last run
+            run_end = size-1;
         }
 
 
@@ -206,7 +219,8 @@ public:
         fbwt_rev.close();
         assert(size==idx.bwtR.size());
 
-        rR = idx.bwtR.number_of_runs();
+        idx.rR = idx.bwtR.number_of_runs();
+        ulint rR = idx.rR;
         int log_rR = bitsize(rR);
 
         // read .rev.ssa

@@ -13,7 +13,7 @@ class br_index {
 public:
     using triple = std::tuple<range_t, ulint, ulint>;
     using sparse_bitvector_t = sparse_sd_vector;
-    using rle_string_t = rle_string_sd;
+    using rle_string_t = rle_string;
 
     friend br_index_builder;
 
@@ -82,6 +82,7 @@ public:
     // I/O
     ulint serialize(std::ostream& out);
     void load(std::istream& in);
+    void load(std::istream& in, ulint bl);
     void save_to_file(std::string const& path_prefix);
     void load_from_file(std::string const& path);
     ulint print_space(ulint fix);
@@ -156,12 +157,14 @@ private:
     ulint length;
 
     // left_contraction shorcut for |P|<=bl+1
-    std::vector<sparse_bitvector_t> kmer_start;
-    std::vector<sparse_bitvector_t> kmer_end;
+    std::vector<sparse_bitvector_t> kmer;
+    //std::vector<sparse_bitvector_t> kmer_start;
+    //std::vector<sparse_bitvector_t> kmer_end;
 
     // right_contraction shortcut for |P|<=bl+1
-    std::vector<sparse_bitvector_t> kmer_startR;
-    std::vector<sparse_bitvector_t> kmer_endR;
+    std::vector<sparse_bitvector_t> kmerR;
+    //std::vector<sparse_bitvector_t> kmer_startR;
+    //std::vector<sparse_bitvector_t> kmer_endR;
 
 };
 

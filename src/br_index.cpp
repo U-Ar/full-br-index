@@ -843,11 +843,13 @@ br_sample br_index::left_contraction(br_sample const& prev_sample)
     if (sample.len <= length)
     {
         // predecessor in [0,psi_s]
-        if (run_start == psi_s) sample.range.first = kmer_start[sample.len-1].select(kmer_start[sample.len-1].rank(psi_s+1) - 1);
+        // if (run_start == psi_s) sample.range.first = kmer_start[sample.len-1].select(kmer_start[sample.len-1].rank(psi_s+1) - 1);
+        if (run_start == psi_s) sample.range.first = kmer[sample.len-2].select(kmer[sample.len-2].rank(psi_s+1) - 1);
         else sample.range.first = psi_s;
         
         // successor in [psi_e,n-1]
-        if (run_end == psi_e) sample.range.second = kmer_end[sample.len-1].select(kmer_end[sample.len-1].rank(psi_e));
+        // if (run_end == psi_e) sample.range.second = kmer_end[sample.len-1].select(kmer_end[sample.len-1].rank(psi_e));
+        if (run_end == psi_e) sample.range.second = kmer[sample.len-2].select(kmer[sample.len-2].rank(psi_e+1)) - 1;
         else sample.range.second = psi_e;
     }
     else 
@@ -923,11 +925,13 @@ br_sample br_index::right_contraction(br_sample const& prev_sample)
     if (sample.len <= length)
     {
         // predecessor in [0,psiR_sR]
-        if (run_start == psiR_sR) sample.rangeR.first = kmer_startR[sample.len-1].select(kmer_startR[sample.len-1].rank(psiR_sR+1) - 1);
+        //if (run_start == psiR_sR) sample.rangeR.first = kmer_startR[sample.len-1].select(kmer_startR[sample.len-1].rank(psiR_sR+1) - 1);
+        if (run_start == psiR_sR) sample.rangeR.first = kmerR[sample.len-2].select(kmerR[sample.len-2].rank(psiR_sR+1)-1);
         else sample.rangeR.first = psiR_sR;
         
         // successor in [psiR_eR,n-1]
-        if (run_end == psiR_eR) sample.rangeR.second = kmer_endR[sample.len-1].select(kmer_endR[sample.len-1].rank(psiR_eR));
+        //if (run_end == psiR_eR) sample.rangeR.second = kmer_endR[sample.len-1].select(kmer_endR[sample.len-1].rank(psiR_eR));
+        if (run_end == psiR_eR) sample.rangeR.second = kmerR[sample.len-2].select(kmerR[sample.len-2].rank(psiR_eR+1)) - 1;
         else sample.rangeR.second = psiR_eR;
     }
     else
@@ -1366,11 +1370,13 @@ ulint br_index::serialize(std::ostream& out)
 
     for (ulint k = 0; k < length; ++k)
     {
-        w_bytes += kmer_start[k].serialize(out);
-        w_bytes += kmer_end[k].serialize(out);
+        w_bytes += kmer[k].serialize(out);
+        //w_bytes += kmer_start[k].serialize(out);
+        //w_bytes += kmer_end[k].serialize(out);
 
-        w_bytes += kmer_startR[k].serialize(out);
-        w_bytes += kmer_endR[k].serialize(out);
+        w_bytes += kmerR[k].serialize(out);
+        //w_bytes += kmer_startR[k].serialize(out);
+        //w_bytes += kmer_endR[k].serialize(out);
     }
 
 
@@ -1428,22 +1434,83 @@ void br_index::load(std::istream& in)
     kmer_endR.resize(length);
     for (ulint k = 0; k < length; ++k)
     {
-        kmer_start[k].load(in);
-        kmer_end[k].load(in);
+        kmer[k].load(in);
+        //kmer_start[k].load(in);
+        //kmer_end[k].load(in);
 
-        kmer_startR[k].load(in);
-        kmer_endR[k].load(in);
+        kmerR[k].load(in);
+        //kmer_startR[k].load(in);
+        //kmer_endR[k].load(in);
     }
 
 }
+void br_index::load(std::istream& in, ulint bl)
+{
+
+    in.read((char*)&sigma,sizeof(sigma));
+    in.read((char*)&length,sizeof(length));
+
+    if (bl > length) {
+        perror("br_index load error. Given bl is larger than idx file's parameter.");
+        exit(1);
+    }
+
+    length = bl;
+
+    remap = std::vector<uchar>(256);
+    in.read((char*)remap.data(),256*sizeof(uchar));
+    remap_inv = std::vector<uchar>(256);
+    in.read((char*)remap_inv.data(),256*sizeof(uchar));
+    
+    in.read((char*)&last_SA_val,sizeof(last_SA_val));
+    
+    F = std::vector<ulint>(256);
+    in.read((char*)F.data(),256*sizeof(ulint));
+
+    bwt.load(in);
+    bwtR.load(in);
+    r = bwt.number_of_runs();
+    rR = bwtR.number_of_runs();
+
+    samples_first.load(in);
+    samples_last.load(in);
+
+    first.load(in);
+    first_to_run.load(in);
+
+    last.load(in);
+    last_to_run.load(in);
+
+    samples_firstR.load(in);
+    samples_lastR.load(in);
+
+    firstR.load(in);
+    first_to_runR.load(in);
+
+    lastR.load(in);
+    last_to_runR.load(in);
+    
+    plcp.load(in);
+    plcpR.load(in);
+
+    kmer_start.resize(length);
+    kmer_end.resize(length);
+    kmer_startR.resize(length);
+    kmer_endR.resize(length);
+    for (ulint k = 0; k < length; ++k)
+    {
+        kmer[k].load(in);
+        kmerR[k].load(in);
+    }
+}
 
 /*
- * save index to "{path_prefix}.brif" file
+ * save index to "{path_prefix}.bri" file
  */
 void br_index::save_to_file(std::string const& path_prefix)
 {
 
-    std::string path = path_prefix + ".brif";
+    std::string path = path_prefix + ".bri";
     
     std::ofstream out(path);
     serialize(out);
@@ -1550,23 +1617,15 @@ ulint br_index::print_space(ulint fix)
     tot_bytes += bytes;
     std::cout << "last_to_runR:   " << bytes << " bytes" << std::endl;
 
-    std::cout << "kmer_start, kmer_end, kmer_startR, kmer_endR: ";
+    std::cout << "kmer, kmerR: ";
     ulint kmer_bytes = 0;
     for (ulint k = 0; k < fix; ++k)
     {
-        bytes =  kmer_start[k].serialize(out);
+        bytes =  kmer[k].serialize(out);
         kmer_bytes += bytes;
         tot_bytes += bytes;
 
-        bytes =  kmer_end[k].serialize(out);
-        kmer_bytes += bytes;
-        tot_bytes += bytes;
-
-        bytes =  kmer_startR[k].serialize(out);
-        kmer_bytes += bytes;
-        tot_bytes += bytes;
-
-        bytes =  kmer_endR[k].serialize(out);
+        bytes =  kmerR[k].serialize(out);
         kmer_bytes += bytes;
         tot_bytes += bytes;
     }
@@ -1624,11 +1683,11 @@ ulint br_index::get_space()
 
     for (ulint k = 0; k < length; ++k)
     {
-        tot_bytes += kmer_start[k].serialize(out);
-        tot_bytes += kmer_end[k].serialize(out);
+        tot_bytes += kmer[k].serialize(out);
+        //tot_bytes += kmer_end[k].serialize(out);
 
-        tot_bytes += kmer_startR[k].serialize(out);
-        tot_bytes += kmer_endR[k].serialize(out);
+        tot_bytes += kmerR[k].serialize(out);
+        //tot_bytes += kmer_endR[k].serialize(out);
     }
 
     return tot_bytes;
