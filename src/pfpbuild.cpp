@@ -148,18 +148,55 @@ public:
         rR = idx.bwtR.number_of_runs();
         int log_rR = bitsize(rR);
 
-        // read .rev.ssa & .rev.esa
+        // read .rev.ssa
         FILE* file_ssa_rev = open_aux_file(input_rev,EXTSSA,"rb");
+
+        idx.samples_firstR = sdsl::int_vector<>(rR,0,log_n);
+        idx.first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+        {
+            auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
+            ulint* sa_val;
+            for (ulint i = 0; i < rR; ++i) {
+                size_t s = fread(sa_val,SABYTES,1,file_ssa_rev);
+                if (s!=1) die(".rev.ssa read failed");
+                samples_firstR[i] = *sa_val;
+                pos_run_pairs[i] = {*sa_val,i};
+            }
+            std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
+
+            std::vector<ulint> first_pos;
+            for (ulint i = 0; i < rR; ++i) {
+                first_pos.push_back(pos_run_pairs[i].first);
+                first_to_runR[i] = pos_run_pairs[i].second;
+            }
+            idx.firstR = sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
+        }
+        fclose(file_ssa_rev);
+
+        // read .rev.esa
         FILE* file_esa_rev = open_aux_file(input_rev,EXTESA,"rb");
 
-        idx.samples_firstR = sdsl::int_vector<>(r,0,log_n);
-        idx.samples_lastR = sdsl::int_vector<>(r,0,log_n);
-        idx.first_to_runR = sdsl::int_vector<>(r,0,log_rR);
-        idx.last_to_runR = sdsl::int_vector<>(r,0,log_rR);
+        idx.samples_lastR = sdsl::int_vector<>(rR,0,log_n);
+        idx.last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
         {
-            std::vector<ulint> first_posR;
-            std::vector<ulint> last_posR;
+            auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
+            ulint* sa_val;
+            for (ulint i = 0; i < rR; ++i) {
+                size_t s = fread(sa_val,SABYTES,1,file_esa_rev);
+                if (s!=1) die(".rev.esa read failed");
+                samples_lastR[i] = *sa_val;
+                pos_run_pairs[i] = {*sa_val,i};
+            }
+            std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
+
+            std::vector<ulint> last_pos;
+            for (ulint i = 0; i < rR; ++i) {
+                last_pos.push_back(pos_run_pairs[i].first);
+                last_to_runR[i] = pos_run_pairs[i].second;
+            }
+            idx.lastR = sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
+        fclose(file_esa_rev);
 
 
 
