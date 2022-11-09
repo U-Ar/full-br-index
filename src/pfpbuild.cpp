@@ -28,9 +28,13 @@ public:
     // input: file basename of Prefix-Free Parsing (.bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary)
     // bl: parameter
     br_index_builder& build_from_pfp(std::string const& input, int bl) {
+
+        std::cout << "Building br-index on " << input << std::endl;
+
         idx = br_index();
         idx.length = (ulint)bl;
 
+        std::cout << "bl: " << bl << std::endl;
 
         // read .bwt
         std::ifstream fbwt(input + ".bwt", std::ifstream::ate);
@@ -40,6 +44,8 @@ public:
         }
         long size = fbwt.tellg();
         fbwt.seekg(0);
+
+        std::cout << "Remapping alphabet ... " << std::flush;
 
         // construct alphabet remapper (null character \0 is mapped to \1)
         idx.remap = std::vector<uchar>(256,0); idx.remap[0] = 1;
@@ -69,6 +75,8 @@ public:
             for (ulint i = 1; i < 256; ++i) idx.F[i] += idx.F[i-1];
         }
 
+        std::cout << "done.\nBuilding RLBWT ... " << std::flush;
+
         // build RLBWT with remapper
         fbwt.seekg(0);
         idx.bwt.load_from_plain(fbwt,size,idx.remap);
@@ -79,6 +87,10 @@ public:
         ulint r = idx.r;
         int log_r = bitsize(r);
         int log_n = bitsize(size);
+
+        std::cout << "done.\nNumber of runs in BWT  r: " << r << std::endl;
+
+        std::cout << "Reading SA samples at run boundaries ... " << std::flush;
 
         // read .ssa
         FILE* file_ssa = open_aux_file(input,EXTSSA,"rb");
@@ -101,7 +113,7 @@ public:
                 first_pos.push_back(pos_run_pairs[i].first);
                 first_to_run[i] = pos_run_pairs[i].second;
             }
-            idx.first = sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
+            idx.first = br_index::sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
         }
         fclose(file_ssa);
 
@@ -127,9 +139,11 @@ public:
                 last_pos.push_back(pos_run_pairs[i].first);
                 last_to_run[i] = pos_run_pairs[i].second;
             }
-            idx.last = sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
+            idx.last = br_index::sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
         fclose(file_esa);
+
+        std::cout << "done.\nBuilding run-length compressed PLCP ... " << std::flush;
 
         // construct run-length encoded PLCP
         {
@@ -142,6 +156,7 @@ public:
             uchar c0 = idx.F_at(i-1); // T[\phi(0)]
             ulint l = 0, prev_l = 0;
             ulint acc0 = 0, acc1 = 0;
+            ones.push_back(0);
             for (ulint j = 0; j < size-1; ++j) {
                 while (c == c0) {
                     // compute FL(i) & FL(i0), compare BWT chars
@@ -163,9 +178,13 @@ public:
                 }
 
                 if (j == 0) {
-                    acc0 += l;
-                    zeros.push_back(acc0);
-                    acc1++;
+                    if (l) {
+                        acc0 += l - 1;
+                        zeros.push_back(acc0);
+                        acc1++;
+                    } else {
+                        acc1++;
+                    }
                 }
                 else if (l + 1 - prev_l) {
                     ones.push_back(acc1);
@@ -184,25 +203,73 @@ public:
             idx.plcp = permuted_lcp(size,ones,zeros);
         }
 
-        // consruct kmer_start, kmer_end
+        std::cout << "done.\nBuilding kmer[0,bl) ... " << std::flush;
+
         // 各runの境界につき、その前後を探索する形？
         // run_range(run_num)でrunの範囲が分かる。そんでそこからSAの値もわかるので、
         // そこ起点で広げたらいけるのでは？という気がしている
+        
+        // consruct kmer[0,bl) (contraction shortcut bitvector)
         {
-            // first run
-            ulint run_start = 0;
-            ulint run_end = idx.bwt.run_end(0);
+            auto kmer_pos = std::vector<std::vector<ulint>>(bl);
+            // first run head
+            for (ulint i = 0; i < bl; ++i) kmer_pos[i].push_back(0);
 
-            for (ulint i = 0; i < r-1; ++i) {
-                auto run_range = idx.bwt.run_range(i+1);
+            ulint prev_run_start = 0;
+            ulint run_start, run_end;
+            ulint cur_sa, min_lcp_l, min_lcp_r;
+
+            for (ulint i = 1; i < r; ++i) {
+                auto run_range = idx.bwt.run_range(i);
                 run_start = run_range.first;
+                run_end = run_range.second;
+
+                ulint start_sa = idx.samples_first[i] < size-1 ? idx.samples_first[i]+1 : 0;
+                min_lcp_l = min_lcp_r = idx.plcp[start_sa];
+                if (min_lcp_l > bl) min_lcp_l = min_lcp_r = bl;
+                
+                for (ulint l = min_lcp_l; l < bl; ++l) kmer_pos[l].push_back(run_start);
+
+                // backward scan from run head
+                cur_sa = start_sa;
+                for (ulint p = run_start-1; p > prev_run_start; --p) {
+                    if (min_lcp_l==0) break;
+
+                    cur_sa = idx.Phi(cur_sa);
+                    ulint lcp = idx.plcp[cur_sa];
+                    if (lcp < min_lcp_l) {
+                        for (ulint l = lcp; l < min_lcp_l; ++l) {
+                            if (kmer_pos[l].back() != p) kmer_pos[l].push_back(p);
+                        } 
+                        min_lcp_l = lcp;
+                    }
+                }
+                // forward scan from run head
+                cur_sa = start_sa;
+                for (ulint p = run_start+1; p <= run_end; ++p) {
+                    if (min_lcp_r==0) break;
+
+                    cur_sa = idx.PhiI(cur_sa);
+                    ulint lcp = idx.plcp[cur_sa];
+                    if (lcp < min_lcp_r) {
+                        for (ulint l = lcp; l < min_lcp_r; ++l) kmer_pos[l].push_back(p);
+                        min_lcp_r = lcp;
+                    }
+                }
+
+                prev_run_start = run_start;
             }
-            
-            // last run
-            run_end = size-1;
+            // last run tail
+            for (ulint i = 0; i < bl; ++i) kmer_pos[i].push_back(size);
+
+            idx.kmer = std::vector<br_index::sparse_bitvector_t>(bl);
+            for (ulint i = 0; i < bl; ++i) {
+                idx.kmer[i] = br_index::sparse_bitvector_t(kmer_pos[i].cbegin(),kmer_pos[i].cend());
+            }
         }
-
-
+        
+        std::cout << "done." << std::endl;
+        std::cout << "Start building components for the reversed direction." << std::endl;
 
         // load from reversed files
         std::string input_rev = input + ".rev";
@@ -214,6 +281,8 @@ public:
             throw new std::runtime_error("Cannot open file " + input_rev + ".bwt");
         }
 
+        std::cout << "Building RLBWT^R ... " << std::flush;
+
         // build RLBWT^R with remapper
         idx.bwtR.load_from_plain(fbwt_rev,size,idx.remap);
         fbwt_rev.close();
@@ -222,6 +291,10 @@ public:
         idx.rR = idx.bwtR.number_of_runs();
         ulint rR = idx.rR;
         int log_rR = bitsize(rR);
+
+        std::cout << "done.\nNumber of runs in BWT^R  rR: " << rR << std::endl;
+
+        std::cout << "Reading SA^R samples at run boundaries ... " << std::flush;
 
         // read .rev.ssa
         FILE* file_ssa_rev = open_aux_file(input_rev,EXTSSA,"rb");
@@ -275,6 +348,8 @@ public:
         }
         fclose(file_esa_rev);
 
+        std::cout << "done.\nBuilding run-length compressed PLCP^R ... " << std::flush;
+
         // construct run-length encoded PLCP^R
         {
             std::vector<ulint> ones, zeros;
@@ -286,6 +361,7 @@ public:
             uchar c0 = idx.F_at(i-1); // T[\phi(0)]
             ulint l = 0, prev_l = 0;
             ulint acc0 = 0, acc1 = 0;
+            ones.push_back(0);
             for (ulint j = 0; j < size-1; ++j) {
                 while (c == c0) {
                     // compute FLR(i) & FLR(i0), compare BWT^R chars
@@ -307,9 +383,13 @@ public:
                 }
 
                 if (j == 0) {
-                    acc0 += l;
-                    zeros.push_back(acc0);
-                    acc1++;
+                    if (l) {
+                        acc0 += l - 1;
+                        zeros.push_back(acc0);
+                        acc1++;
+                    } else {
+                        acc1++;
+                    }
                 }
                 else if (l + 1 - prev_l) {
                     ones.push_back(acc1);
@@ -328,15 +408,80 @@ public:
             idx.plcpR = permuted_lcp(size,ones,zeros);
         }
 
+        std::cout << "done.\nBuilding kmer^R[0,bl) ... " << std::flush;
 
 
+        // consruct kmerR[0,bl) (contraction shortcut bitvector)
+        {
+            auto kmer_pos = std::vector<std::vector<ulint>>(bl);
+            // first run head
+            for (ulint i = 0; i < bl; ++i) kmer_pos[i].push_back(0);
+
+            ulint prev_run_start = 0;
+            ulint run_start, run_end;
+            ulint cur_sa, min_lcp_l, min_lcp_r;
+
+            for (ulint i = 1; i < rR; ++i) {
+                auto run_range = idx.bwtR.run_range(i);
+                run_start = run_range.first;
+                run_end = run_range.second;
+
+                ulint start_sa = idx.samples_firstR[i] < size-1 ? idx.samples_firstR[i]+1 : 0;
+                min_lcp_l = min_lcp_r = idx.plcpR[start_sa];
+                if (min_lcp_l > bl) min_lcp_l = min_lcp_r = bl;
+                
+                for (ulint l = min_lcp_l; l < bl; ++l) kmer_pos[l].push_back(run_start);
+
+                // backward scan from run head
+                cur_sa = start_sa;
+                for (ulint p = run_start-1; p > prev_run_start; --p) {
+                    if (min_lcp_l==0) break;
+
+                    cur_sa = idx.PhiR(cur_sa);
+                    ulint lcp = idx.plcpR[cur_sa];
+                    if (lcp < min_lcp_l) {
+                        for (ulint l = lcp; l < min_lcp_l; ++l) {
+                            if (kmer_pos[l].back() != p) kmer_pos[l].push_back(p);
+                        } 
+                        min_lcp_l = lcp;
+                    }
+                }
+                // forward scan from run head
+                cur_sa = start_sa;
+                for (ulint p = run_start+1; p <= run_end; ++p) {
+                    if (min_lcp_r==0) break;
+
+                    cur_sa = idx.PhiIR(cur_sa);
+                    ulint lcp = idx.plcpR[cur_sa];
+                    if (lcp < min_lcp_r) {
+                        for (ulint l = lcp; l < min_lcp_r; ++l) kmer_pos[l].push_back(p);
+                        min_lcp_r = lcp;
+                    }
+                }
+
+                prev_run_start = run_start;
+            }
+            // last run tail
+            for (ulint i = 0; i < bl; ++i) kmer_pos[i].push_back(size);
+
+            idx.kmerR = std::vector<br_index::sparse_bitvector_t>(bl);
+            for (ulint i = 0; i < bl; ++i) {
+                idx.kmerR[i] = br_index::sparse_bitvector_t(kmer_pos[i].cbegin(),kmer_pos[i].cend());
+            }
+        }
+
+        std::cout << "done." << std::endl;
+        std::cout << "Completed br-index construction." << std::endl;
         
-        return this;
+        return *this;
     }
 
     ulint save_to_file(std::string const& output) {
+        std::cout << "Saving br-index to " << output + EXTIDX << " ... " << std::flush;
         std::ofstream f(output + EXTIDX);
-        return idx.serialize(f);
+        ulint bytes = idx.serialize(f);
+        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
+        return bytes;
     }
 };
 
@@ -390,7 +535,7 @@ void parse_args( int argc, char** argv, Args& arg ) {
     }
     // check algorithm parameters 
     if(arg.bl < 0) {
-        std::cout << "bl must be nonnegative value\n";
+        std::cout << "bl must be nonnegative integer\n";
         exit(1);
     }
 }
@@ -398,8 +543,6 @@ void parse_args( int argc, char** argv, Args& arg ) {
 int main(int argc, char** argv) {
     Args arg;
     parse_args(argc, argv, arg);
-    std::cout << "bl: " << arg.bl << std::endl;
-    std::cout << "Index file will be saved to " << arg.output_base << "." << EXTIDX << std::endl;
 
     br_index_builder builder;
     ulint idx_size = builder.build_from_pfp(arg.input_file,arg.bl).save_to_file(arg.output_base);
