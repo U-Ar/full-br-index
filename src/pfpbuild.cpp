@@ -491,7 +491,8 @@ public:
 void print_help(char** argv, Args &args) {
     std::cout << "Usage: " << argv[ 0 ] << " <input filename> [options]" << std::endl;
     std::cout << "Build br-index from Prefix-Free Parsed files." << std::endl;
-    std::cout << " .bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary." << std::endl << std::endl;
+    std::cout << " .bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary" << std::endl;
+    std::cout << " unless you use -i option (in-memory construction, slow&memory consuming)." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl
         << "\t-i  \tin-memory construction using constructor of br_index" << std::endl

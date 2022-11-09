@@ -37,6 +37,8 @@ int main(int argc, char *argv[])
     printf("\nUsage:\n\t %s name\n\n", argv[0]);
     puts("Compute the BWT of file name and output it to name.Bwt");
     puts("The input file cannot contain the zero character");
+    puts("If you give another command line argument (like -r), read the input file in the reversed order");
+    puts("In this case BWT^R will be output to name.rev.Bwt");
     exit(1);
   }
   puts("==== Command line:");
@@ -62,7 +64,26 @@ int main(int argc, char *argv[])
   Text = malloc(n+1);
   if(Text==NULL) die("malloc 1");
   rewind(fin);
-  size_t s = fread(Text,1,n,fin);
+
+  size_t s;
+  if (argc==2) {
+    s = fread(Text,1,n,fin);
+  } else { // reversed order
+    long BUFF_SIZE = 4096;
+    uint8_t *buffer = malloc(BUFF_SIZE);
+    s = 0;
+    size_t pos = n-1;
+    for (long i = (n-1)/BUFF_SIZE; i >= 0; --i) {
+      fseek(fin,i*BUFF_SIZE,SEEK_SET);
+      size_t sb = fread(buffer,1,BUFF_SIZE,fin);
+      s += sb;
+      for (long j = (long)sb-1; j >= 0; --j) {
+        Text[pos--] = buffer[j];
+      }
+    }
+    free(buffer);
+  }
+
   if(s!=n) {
     char *msg=NULL;
     int e= asprintf(&msg,"read parse error: %zu vs %ld\n", s,n); 
@@ -77,7 +98,8 @@ int main(int argc, char *argv[])
   int depth = sacak(Text,SA, n+1);
   printf("SA computed with depth: %d\n", depth);
   // ---- output BWT
-  e = asprintf(&name,"%s.Bwt",argv[1]);
+  if (argc==2) e = asprintf(&name,"%s.Bwt",argv[1]);
+  else e = asprintf(&name,"%s.rev.Bwt",argv[1]);
   if(e<1) die("asprint error");  
   FILE *fbwt = fopen(name,"wb");
   free(name);

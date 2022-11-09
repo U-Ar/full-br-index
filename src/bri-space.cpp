@@ -14,7 +14,7 @@ struct Args {
 };
 
 void print_help(char** argv, Args &args) {
-    std::cout << "Usage: " << argv[0] << " [options] <index file>" << std::endl;
+    std::cout << "Usage: " << argv[0] << " <index file> [options]" << std::endl;
     std::cout << "Show breakdown of br-index space usage." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl 

@@ -1,0 +1,11 @@
+*.x
+*.o
+bwtparse
+bwtparse64
+remap
+simplebwt
+simplebwt64
+unparse
+unparsz
+yeast.fasta.*
+

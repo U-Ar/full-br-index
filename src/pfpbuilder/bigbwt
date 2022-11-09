@@ -54,9 +54,6 @@ def main():
   if args.S and (args.s or args.e) :
     print("You can either compute the full SA or a sample of it, not both. Exiting...")
     return
-  if args.r and args.c:
-    print("You cannot check the reversed BWT since reversed SACAK is not implemented.")
-    return
     
   logfile_name = args.input + ".log"
   print("Sending logging messages to file:", logfile_name)
@@ -172,20 +169,26 @@ def main():
     # --- start checking ---
     if args.c:
       start = time.time()
-      if(os.path.getsize(args.input)>= 2**31):
-        command = "{exe} {file}".format(exe = bwt_exe64, file=args.input)
+      if args.r:
+        if(os.path.getsize(args.input.removesuffix(".rev"))>= 2**31):
+          command = "{exe} {file} -r".format(exe = bwt_exe64, file=args.input.removesuffix(".rev"))
+        else:
+          command = "{exe} {file} -r".format(exe = bwt_exe, file=args.input.removesuffix(".rev"))
       else:
-        command = "{exe} {file}".format(exe = bwt_exe, file=args.input)
+        if(os.path.getsize(args.input)>= 2**31):
+          command = "{exe} {file}".format(exe = bwt_exe64, file=args.input)
+        else:
+          command = "{exe} {file}".format(exe = bwt_exe, file=args.input)
       print("==== Computing BWT using sacak. Command:", command)       
       if(execute_command(command,logfile,logfile_name)!=True):
         return   
-      print("Elapsed time: {0:.4f}".format(time.time()-start));      
-      command = "cmp {file}.bwt {file}.Bwt".format(file=args.input); 
-      print("==== Comparing BWTs. Command:", command);
+      print("Elapsed time: {0:.4f}".format(time.time()-start))    
+      command = "cmp {file}.bwt {file}.Bwt".format(file=args.input)
+      print("==== Comparing BWTs. Command:", command)
       if(execute_command(command,logfile,logfile_name)):
-        print("BWTs match");
+        print("BWTs match")
       else:
-        print("BWTs differ");
+        print("BWTs differ")
     # --- end checking ---
 
   print("==== Done")

@@ -10,9 +10,6 @@
 using namespace bri;
 using namespace std;
 
-string check = string();
-long length = 0;
-
 // struct containing command line parameters and other globals
 struct Args {
     string check = "";
@@ -22,7 +19,7 @@ struct Args {
 };
 
 void print_help(char** argv, Args &args) {
-    std::cout << "Usage: " << argv[0] << " [options] <index file> <pattern file>" << std::endl;
+    std::cout << "Usage: " << argv[0] << " <index file> <pattern file> [options]" << std::endl;
     std::cout << "Compute Maximal Exact Matches on given pattern using br-index." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-c C\tcheck correctness of each pattern occurrence" << std::endl
@@ -183,7 +180,7 @@ int main(int argc, char** argv)
 
     ifstream in(arg.idx_file);
 
-    locate_all<br_index>(args, in, patt_file);
+    locate_all<br_index>(arg, in, patt_file);
     
     in.close();
 
