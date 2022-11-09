@@ -115,13 +115,11 @@ private:
     
     // RLBWT
     rle_string_t bwt;
-    ulint terminator_position = 0; // not used, left for backward compatibility
     ulint last_SA_val = 0;
     ulint r = 0;
 
     // RLBWT^R
     rle_string_t bwtR;
-    ulint terminator_positionR = 0; // not used, left for backward compatibility
     ulint rR = 0;
 
     // left_extension

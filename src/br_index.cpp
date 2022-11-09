@@ -176,13 +176,13 @@ br_index::br_index(std::string const& input, ulint length=8, bool sais = true) {
 
 
     // remember BWT position of terminator
-    for(ulint i = 0; i < bwt_s.size(); ++i)
-        if(bwt_s[i]==TERMINATOR)
-            terminator_position = i;
+    // for(ulint i = 0; i < bwt_s.size(); ++i)
+    //     if(bwt_s[i]==TERMINATOR)
+    //         terminator_position = i;
     
-    for(ulint i = 0; i < bwt_sR.size(); ++i)
-        if(bwt_sR[i]==TERMINATOR)
-            terminator_positionR = i;
+    // for(ulint i = 0; i < bwt_sR.size(); ++i)
+    //     if(bwt_sR[i]==TERMINATOR)
+    //         terminator_positionR = i;
 
     assert(input.size() + 1 == bwt.size());
 
@@ -1326,8 +1326,8 @@ ulint br_index::serialize(std::ostream& out)
     out.write((char*)remap.data(),256*sizeof(uchar));
     out.write((char*)remap_inv.data(),256*sizeof(uchar));
 
-    out.write((char*)&terminator_position,sizeof(terminator_position));
-    out.write((char*)&terminator_positionR,sizeof(terminator_positionR));
+    //out.write((char*)&terminator_position,sizeof(terminator_position));
+    //out.write((char*)&terminator_positionR,sizeof(terminator_positionR));
     out.write((char*)&last_SA_val,sizeof(last_SA_val));
     out.write((char*)F.data(),256*sizeof(ulint));
 
@@ -1335,8 +1335,8 @@ ulint br_index::serialize(std::ostream& out)
                 + sizeof(length)
                 + 256*sizeof(uchar)
                 + 256*sizeof(uchar)
-                + sizeof(terminator_position)
-                + sizeof(terminator_positionR)
+                //+ sizeof(terminator_position)
+                //+ sizeof(terminator_positionR)
                 + sizeof(last_SA_val)
                 + 256*sizeof(ulint);
     
@@ -1361,6 +1361,9 @@ ulint br_index::serialize(std::ostream& out)
     w_bytes += lastR.serialize(out);
     w_bytes += last_to_runR.serialize(out);
 
+    w_bytes += plcp.serialize(out);
+    w_bytes += plcpR.serialize(out);
+
     for (ulint k = 0; k < length; ++k)
     {
         w_bytes += kmer_start[k].serialize(out);
@@ -1370,8 +1373,6 @@ ulint br_index::serialize(std::ostream& out)
         w_bytes += kmer_endR[k].serialize(out);
     }
 
-    w_bytes += plcp.serialize(out);
-    w_bytes += plcpR.serialize(out);
 
     return w_bytes;
 
@@ -1388,8 +1389,8 @@ void br_index::load(std::istream& in)
     remap_inv = std::vector<uchar>(256);
     in.read((char*)remap_inv.data(),256*sizeof(uchar));
     
-    in.read((char*)&terminator_position,sizeof(terminator_position));
-    in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
+    //in.read((char*)&terminator_position,sizeof(terminator_position));
+    //in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
     in.read((char*)&last_SA_val,sizeof(last_SA_val));
     
     F = std::vector<ulint>(256);
@@ -1417,6 +1418,9 @@ void br_index::load(std::istream& in)
 
     lastR.load(in);
     last_to_runR.load(in);
+    
+    plcp.load(in);
+    plcpR.load(in);
 
     kmer_start.resize(length);
     kmer_end.resize(length);
@@ -1430,9 +1434,6 @@ void br_index::load(std::istream& in)
         kmer_startR[k].load(in);
         kmer_endR[k].load(in);
     }
-
-    plcp.load(in);
-    plcpR.load(in);
 
 }
 
@@ -1477,8 +1478,8 @@ ulint br_index::print_space(ulint fix)
                     + sizeof(length)
                     + 256*sizeof(uchar)
                     + 256*sizeof(uchar)
-                    + sizeof(terminator_position)
-                    + sizeof(terminator_positionR)
+                    //+ sizeof(terminator_position)
+                    //+ sizeof(terminator_positionR)
                     + sizeof(last_SA_val)
                     + 256*sizeof(ulint);
     
@@ -1589,8 +1590,8 @@ ulint br_index::get_space()
                     + sizeof(length)
                     + 256*sizeof(uchar)
                     + 256*sizeof(uchar)
-                    + sizeof(terminator_position)
-                    + sizeof(terminator_positionR)
+                    //+ sizeof(terminator_position)
+                    //+ sizeof(terminator_positionR)
                     + sizeof(last_SA_val)
                     + 256*sizeof(ulint);
 

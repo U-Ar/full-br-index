@@ -92,6 +92,16 @@ public:
     }
 
     /*
+     * constructor receiving positional vectors of One-Zero encoding directly
+     */
+    template<class iterable_t>
+    permuted_lcp(ulint n, iterable_t const& O, iterable_t const& Z) {
+        this->n = n;
+        ones = sparse_bitvector_t(O.cbegin(),O.cend());
+        zeros = sparse_bitvector_t(Z.cbegin(),Z.cend());
+    }
+
+    /*
      * get PLCP[i]
      */
     ulint operator[](size_t i)
@@ -186,7 +196,7 @@ private:
     ulint n = 0;
 
     // length of ones & zeros
-    ulint u = 0;
+    ulint u = 0; // not used
 
     // run length encoded PLCP representation
     sparse_bitvector_t ones;

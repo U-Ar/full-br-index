@@ -433,7 +433,7 @@ public:
         run_heads = string_t(run_heads_s);
         assert(run_heads.size()==r);
 
-        // initializa sd_vector with iterator on position vector
+        // initialize sd_vector with iterator on position vector
         runs_per_letter_pos[last_c].push_back(freqs[last_c]);
         runs_per_letter = std::vector<sparse_bitvector_t>(256);
         for (ulint i = 0; i < 256; ++i) {

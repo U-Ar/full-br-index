@@ -29,6 +29,7 @@ public:
     // bl: parameter
     br_index_builder& build_from_pfp(std::string const& input, int bl) {
         idx = br_index();
+        idx.length = (ulint)bl;
 
 
         // read .bwt
@@ -89,8 +90,8 @@ public:
             for (ulint i = 0; i < r; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_ssa);
                 if (s!=1) die(".ssa read failed");
-                samples_first[i] = *sa_val;
-                pos_run_pairs[i] = {*sa_val,i};
+                samples_first[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
@@ -114,9 +115,10 @@ public:
             for (ulint i = 0; i < r; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_esa);
                 if (s!=1) die(".esa read failed");
-                samples_last[i] = *sa_val;
-                pos_run_pairs[i] = {*sa_val,i};
+                samples_last[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
+            idx.last_SA_val = *sa_val;
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> last_pos;
@@ -127,6 +129,65 @@ public:
             idx.last = sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
         fclose(file_esa);
+
+        // construct run-length encoded PLCP
+        {
+            std::vector<ulint> ones, zeros;
+
+            ulint i = idx.FL(0); // ISA[0]
+            assert(i>0);
+            uchar c = idx.F_at(i); // T[0]
+            ulint i0 = i-1;
+            uchar c0 = idx.F_at(i-1); // T[\phi(0)]
+            ulint l = 0, prev_l = 0;
+            ulint acc0 = 0, acc1 = 0;
+            for (ulint j = 0; j < size-1; ++j) {
+                while (c == c0) {
+                    // compute FL(i) & FL(i0), compare BWT chars
+                    l++;
+                    ulint p = i - idx.F[c];
+                    i = idx.bwt.select(p,c);
+                    c = idx.F_at(i);
+                    ulint p0 = i0 - idx.F[c0];
+                    i0 = idx.bwt.select(p0,c0);
+                    c0 = idx.F_at(i0);
+                }
+                if (l==0) {
+                    ulint p = i - idx.F[c];
+                    i = idx.bwt.select(p,c); // i = FL(i)
+                    c = idx.F_at(i);
+                    assert(i>0 || j == size-2);
+                    i0 = i - 1;
+                    c0 = idx.F_at(i0);
+                }
+
+                if (j == 0) {
+                    acc0 += l;
+                    zeros.push_back(acc0);
+                    acc1++;
+                }
+                else if (l + 1 - prev_l) {
+                    ones.push_back(acc1);
+                    acc0 += l + 1 - prev_l;
+                    zeros.push_back(acc0);
+                    acc1++;
+                } else {
+                    acc1++;
+                }
+
+                prev_l = l;
+                if (l) l--;      
+            }
+            ones.push_back(acc1);
+
+            idx.plcp = permuted_lcp(size,ones,zeros);
+        }
+
+        // consruct kmer_start, kmer_end
+        {
+            fbwt = std::ifstream(input + ".bwt");
+            
+        }
 
 
 
@@ -159,8 +220,8 @@ public:
             for (ulint i = 0; i < rR; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_ssa_rev);
                 if (s!=1) die(".rev.ssa read failed");
-                samples_firstR[i] = *sa_val;
-                pos_run_pairs[i] = {*sa_val,i};
+                samples_firstR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
@@ -178,15 +239,17 @@ public:
 
         idx.samples_lastR = sdsl::int_vector<>(rR,0,log_n);
         idx.last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
+        ulint last_SA_valR; // temporary
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
             ulint* sa_val;
             for (ulint i = 0; i < rR; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_esa_rev);
                 if (s!=1) die(".rev.esa read failed");
-                samples_lastR[i] = *sa_val;
-                pos_run_pairs[i] = {*sa_val,i};
+                samples_lastR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
+            last_SA_valR = *sa_val;
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> last_pos;
@@ -197,6 +260,59 @@ public:
             idx.lastR = sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
         fclose(file_esa_rev);
+
+        // construct run-length encoded PLCP^R
+        {
+            std::vector<ulint> ones, zeros;
+
+            ulint i = idx.FLR(0); // ISA^R[0]
+            assert(i>0);
+            uchar c = idx.F_at(i); // T[0]
+            ulint i0 = i-1;
+            uchar c0 = idx.F_at(i-1); // T[\phi(0)]
+            ulint l = 0, prev_l = 0;
+            ulint acc0 = 0, acc1 = 0;
+            for (ulint j = 0; j < size-1; ++j) {
+                while (c == c0) {
+                    // compute FLR(i) & FLR(i0), compare BWT^R chars
+                    l++;
+                    ulint p = i - idx.F[c];
+                    i = idx.bwtR.select(p,c);
+                    c = idx.F_at(i);
+                    ulint p0 = i0 - idx.F[c0];
+                    i0 = idx.bwtR.select(p0,c0);
+                    c0 = idx.F_at(i0);
+                }
+                if (l==0) {
+                    ulint p = i - idx.F[c];
+                    i = idx.bwtR.select(p,c); // i = FL(i)
+                    c = idx.F_at(i);
+                    assert(i>0 || j == size-2);
+                    i0 = i - 1;
+                    c0 = idx.F_at(i0);
+                }
+
+                if (j == 0) {
+                    acc0 += l;
+                    zeros.push_back(acc0);
+                    acc1++;
+                }
+                else if (l + 1 - prev_l) {
+                    ones.push_back(acc1);
+                    acc0 += l + 1 - prev_l;
+                    zeros.push_back(acc0);
+                    acc1++;
+                } else {
+                    acc1++;
+                }
+
+                prev_l = l;
+                if (l) l--;      
+            }
+            ones.push_back(acc1);
+
+            idx.plcpR = permuted_lcp(size,ones,zeros);
+        }
 
 
 
