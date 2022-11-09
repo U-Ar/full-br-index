@@ -1,63 +1,77 @@
-#include<iostream>
+#include <unistd.h>
 
-#include "br_index_full.hpp"
+#include <iostream>
+
+#include "br_index.hpp"
 
 using namespace std;
 using namespace bri;
 
-bool limited = false;
-bool fixed_length = false;
+// struct containing command line parameters and other globals
+struct Args {
+    int bl = -1;
+    string idx_file = "";
+};
 
-void help(){
-	cout << "bri-space:   breakdown of index space usage" << endl;
-	cout << "Usage:       bri-space [options] <index>" << endl;
-	cout << "   <index>   index file (with extension .brif)" << endl;
-	exit(0);
+void print_help(char** argv, Args &args) {
+    std::cout << "Usage: " << argv[0] << " [options] <index file>" << std::endl;
+    std::cout << "Show breakdown of br-index space usage." << std::endl << std::endl;
+    std::cout << "  Options: " << std::endl
+        << "\t-h  \tshow help and exit" << std::endl 
+        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl;
+    exit(1);
 }
 
-void parse_args(char** argv, int argc, int &ptr){
+void parse_args( int argc, char** argv, Args& arg ) {
+    int c;
+    extern char *optarg;
+    extern int optind;
 
-	assert(ptr<argc);
+    puts("==== Command line:");
+    for(int i=0;i<argc;i++)
+        printf(" %s",argv[i]);
+    puts("");
 
-	string s(argv[ptr]);
-	ptr++;
-
-	if (s.compare("-limited") == 0)
-    {
-
-        limited = true;
-
+    std::string sarg;
+    while ((c = getopt( argc, argv, "l:h") ) != -1) {
+        switch(c) {
+            case 'l':
+            sarg.assign( optarg );
+            arg.bl = stoi( sarg ); break;
+            case 'h':
+            print_help(argv, arg); exit(1);
+            case '?':
+            cout << "Unknown option. Use -h for help." << endl;
+            exit(1);
+        }
     }
-	else if (s.compare("-fixed") == 0)
-    {
-
-        fixed_length = true;
-
+    if (argc == optind+1) {
+        arg.idx_file.assign(argv[optind]);
     }
-    else
-    {
-		cout << "Error: unrecognized '" << s << "' option." << endl;
-		help();
-	}
-
+    else {
+        std::cout << "Invalid number of arguments" << std::endl;
+        print_help(argv,arg);
+    }
 }
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
 
-	if(argc < 2)
-		help();
+	Args arg;
+    parse_args(argc, argv, arg);
 
-	int ptr = 1;
-	while (ptr < argc-1) parse_args(argv, argc, ptr);
+	br_index idx;
 
-	br_index_full<> idx;
+	cout << "Loading br-index from " << arg.idx_file << " ..." << flush;
 
-	cout << "Loading fully functional br-index from " << argv[ptr] << " ..." << flush;
-	idx.load_from_file(argv[ptr]);
+	ifstream in(arg.idx_file);
+	if (arg.bl == -1) idx.load(in);
+	else idx.load(in,arg.bl);
+
 	cout << "done."<< endl;
+	
 	cout << "--- The breakdown of the br-index space usage ---" << endl;
+	
 	auto space = idx.print_space();
 
-	
 
 }

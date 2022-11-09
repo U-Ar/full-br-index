@@ -44,11 +44,11 @@ public:
 
 
     // br-index functionality
-    br_sample left_extension(uchar c, br_sample const& prev_sample);
-    br_sample right_extension(uchar c, br_sample const& prev_sample);
+    br_sample left_extension(br_sample const& prev_sample, uchar c);
+    br_sample right_extension(br_sample const& prev_sample, uchar c);
     br_sample left_contraction(br_sample const& prev_sample);
     br_sample right_contraction(br_sample const& prev_sample);
-
+    
     br_sample search(std::string const& pattern);
     ulint count_sample(br_sample const& sample);
     ulint count_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples);

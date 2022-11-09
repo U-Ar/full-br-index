@@ -673,7 +673,7 @@ inline br_sample br_index::get_invalid_sample()
  * 
  * assumes c is original char (not remapped)
  */
-br_sample br_index::left_extension(uchar c, br_sample const& prev_sample)
+br_sample br_index::left_extension(br_sample const& prev_sample, uchar c)
 {
     // replace c with internal representation
     c = remap[c];
@@ -742,7 +742,7 @@ br_sample br_index::left_extension(uchar c, br_sample const& prev_sample)
  * 
  * assumes c is original char (not remapped)
  */
-br_sample br_index::right_extension(uchar c, br_sample const& prev_sample)
+br_sample br_index::right_extension(br_sample const& prev_sample, uchar c)
 {
     // replace c with internal representation
     c = remap[c];
@@ -974,7 +974,7 @@ br_sample br_index::search(std::string const& pattern)
     br_sample sample(get_initial_sample());
     for (ulint i = 0; i < pattern.size(); ++i)
     {
-        sample = right_extension(pattern[i],sample);
+        sample = right_extension(sample, pattern[i]);
         if (sample.is_invalid()) return sample;
     }
     return sample;
@@ -1062,7 +1062,7 @@ ulint br_index::count(std::string const& pattern)
     br_sample sample(get_initial_sample());
     for (size_t i = 0; i < pattern.size(); ++i)
     {
-        sample = right_extension(pattern[i],sample);
+        sample = right_extension(sample, pattern[i]);
         if (sample.is_invalid()) return 0;
     }
     return count_sample(sample);
@@ -1076,7 +1076,7 @@ std::vector<ulint> br_index::locate(std::string const& pattern)
     br_sample sample(get_initial_sample());
     for (size_t i = 0; i < pattern.size(); ++i)
     {
-        sample = right_extension(pattern[i],sample);
+        sample = right_extension(sample, pattern[i]);
         if (sample.is_invalid()) return {};
     }
     return locate_sample(sample);
@@ -1095,7 +1095,7 @@ void br_index::maximal_exact_match(std::string const& pattern)
     {
         while (j < m)
         {
-            br_sample new_sample = right_extension((uchar)pattern[j],sample);
+            br_sample new_sample = right_extension(sample, (uchar)pattern[j]);
             if (new_sample.is_invalid()) break;
             extended = true;
             sample = new_sample;
@@ -1146,7 +1146,7 @@ br_sample br_index::child(br_sample const& sample, uchar c)
 {
     if (sample.is_leaf()) return get_invalid_sample();
 
-    br_sample new_sample(right_extension(c,sample));
+    br_sample new_sample(right_extension(sample,c));
     if (new_sample.is_invalid() || new_sample.is_leaf()) return new_sample;
 
     uchar a = bwtR[new_sample.rangeR.first];
@@ -1171,7 +1171,7 @@ br_sample br_index::slink(br_sample const& sample)
 // suffix tree op: weiner-link
 br_sample br_index::wlink(br_sample const& sample, uchar c)
 {
-    return left_extension(c,sample);
+    return left_extension(sample,c);
 }
 
 // suffix tree op: lowest common ancestor

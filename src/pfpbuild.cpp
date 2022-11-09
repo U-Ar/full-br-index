@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include "definitions.hpp"
 #include "rle_string.hpp"
 #include "sparse_sd_vector.hpp"
@@ -19,6 +21,7 @@ struct Args {
     std::string output_base = "";
     int bl = 8;
     int verbose=0;
+    bool inmemory = false;
     FILE *tmp_parse_file, *last_file, *sa_file; 
 };
 
@@ -487,8 +490,11 @@ public:
 
 void print_help(char** argv, Args &args) {
     std::cout << "Usage: " << argv[ 0 ] << " <input filename> [options]" << std::endl;
+    std::cout << "Build br-index from Prefix-Free Parsed files." << std::endl;
+    std::cout << " .bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl
+        << "\t-i  \tin-memory construction using constructor of br_index" << std::endl
         << "\t-l L\tparameter bl for contraction shortcut, def. " << args.bl << std::endl
         << "\t-o O\tspecified output file basename, def. <input filename> " << std::endl;
     exit(1);
@@ -507,7 +513,7 @@ void parse_args( int argc, char** argv, Args& arg ) {
     puts("");
 
     std::string sarg;
-    while ((c = getopt( argc, argv, "hl:o:v") ) != -1) {
+    while ((c = getopt( argc, argv, "hil:o:v") ) != -1) {
         switch(c) {
             case 'l':
             sarg.assign( optarg );
@@ -519,6 +525,8 @@ void parse_args( int argc, char** argv, Args& arg ) {
             arg.verbose++; break;
             case 'h':
             print_help(argv, arg); exit(1);
+            case 'i':
+            arg.inmemory = true; break;
             case '?':
             cout << "Unknown option. Use -h for help." << endl;
             exit(1);
@@ -543,6 +551,25 @@ void parse_args( int argc, char** argv, Args& arg ) {
 int main(int argc, char** argv) {
     Args arg;
     parse_args(argc, argv, arg);
+
+    if (arg.inmemory) {
+        std::cout << "In-memory construction of br_index ..." << std::endl;
+
+        std::string input;
+        std::ifstream fs(arg.input_file);
+        std::stringstream buffer;
+        buffer << fs.rdbuf();
+        input = buffer.str();
+
+        br_index idx(input,arg.bl,false);
+
+        std::cout << "Saving br-index to " << arg.output_base + EXTIDX << " ... " << std::flush;
+        std::ofstream f(arg.output_base + EXTIDX);
+        ulint bytes = idx.serialize(f);
+        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
+
+        return 0;
+    }
 
     br_index_builder builder;
     ulint idx_size = builder.build_from_pfp(arg.input_file,arg.bl).save_to_file(arg.output_base);

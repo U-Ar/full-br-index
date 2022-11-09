@@ -23,6 +23,9 @@ ADD_CUSTOM_COMMAND(
 	COMMENT "Build external PFPbuilder source."
 )
 
+# copy bri-build(Python script) to binary folder
+FILE(COPY "${CMAKE_SOURCE_DIR}/src/bri-build" DESTINATION "${CMAKE_BINARY_DIR}")
+
 
 SET(SDSL_INCLUDE "~/sdsl/include") #SDSL headeres
 SET(SDSL_LIB "~/sdsl/lib") #SDSL lib
@@ -39,10 +42,10 @@ SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -march=native")
 ADD_SUBDIRECTORY(test)
 INCLUDE_DIRECTORIES(src)
 
-ADD_EXECUTABLE(bri-build src/bri-build.cpp)
-TARGET_LINK_LIBRARIES(bri-build sdsl)
-TARGET_LINK_LIBRARIES(bri-build divsufsort)
-TARGET_LINK_LIBRARIES(bri-build divsufsort64)
+# ADD_EXECUTABLE(bri-build src/bri-build.cpp)
+# TARGET_LINK_LIBRARIES(bri-build sdsl)
+# TARGET_LINK_LIBRARIES(bri-build divsufsort)
+# TARGET_LINK_LIBRARIES(bri-build divsufsort64)
 
 ADD_EXECUTABLE(bri-mem src/bri-mem.cpp)
 TARGET_LINK_LIBRARIES(bri-mem sdsl)
@@ -62,7 +65,6 @@ add_executable(run_tests test/run_tests.cpp
 	test/huffman_string_test.cpp
 	test/rle_string_test.cpp
 	test/permuted_lcp_test.cpp
-	test/br_index_test.cpp
 )
 target_link_libraries(run_tests PRIVATE sdsl divsufsort divsufsort64)
 

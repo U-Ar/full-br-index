@@ -1,8 +1,10 @@
+#include <unistd.h>
+
 #include <iostream>
 #include <chrono>
 #include <cstdlib>
 
-#include "br_index_full.hpp"
+#include "br_index.hpp"
 #include "utils.hpp"
 
 using namespace bri;
@@ -11,68 +13,71 @@ using namespace std;
 string check = string();
 long length = 0;
 
-void help()
-{
-	cout << "bri-mem: locate maximal exact matches of the input patterns. " << endl;
+// struct containing command line parameters and other globals
+struct Args {
+    string check = "";
+    int bl = -1;
+    string idx_file = "";
+    string pattern_file = "";
+};
 
-	cout << "Usage: bri-mem [options] <index> <pattern>" << endl;
-	cout << "   (not yet implemented) -c <text>    check correctness of each pattern occurrence on this text file" << endl;
-	cout << "   -bl <length>         parameter (index file's specification by default)" << endl;
-    cout << "                        For contractions of the patterns shorter than <length>, " << endl;
-    cout << "                        shortcut is applied." << endl;cout << "   <index>      index file (with extension .brif)" << endl;
-	cout << "   <pattern>    text file of the pattern you want to search for substrings" << endl;
-
-	exit(0);
+void print_help(char** argv, Args &args) {
+    std::cout << "Usage: " << argv[0] << " [options] <index file> <pattern file>" << std::endl;
+    std::cout << "Compute Maximal Exact Matches on given pattern using br-index." << std::endl << std::endl;
+    std::cout << "  Options: " << std::endl
+        << "\t-c C\tcheck correctness of each pattern occurrence" << std::endl
+        << "\t-h  \tshow help and exit" << std::endl 
+        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl;
+    exit(1);
 }
 
-void parse_args(char** argv, int argc, int &ptr){
+void parse_args( int argc, char** argv, Args& arg ) {
+    int c;
+    extern char *optarg;
+    extern int optind;
 
-	assert(ptr<argc);
+    puts("==== Command line:");
+    for(int i=0;i<argc;i++)
+        printf(" %s",argv[i]);
+    puts("");
 
-	string s(argv[ptr]);
-	ptr++;
-
-	if (s.compare("-c") == 0) 
-    {
-
-		if(ptr>=argc-1){
-			cout << "Error: missing parameter after -c option." << endl;
-			help();
-		}
-
-		check = string(argv[ptr]);
-		ptr++;
-    
-    }
-    else if (s.compare("-bl") == 0)
-    {
-        if(ptr >= argc-1){
-			cout << "Error: missing parameter after -bl option." << endl;
-			help();
-		}
-
-		char* e;
-        length = strtol(argv[ptr],&e,10);
-
-        if(*e != '\0' || length <= 0){
-            cout << "Error: illegal or nonpositive value after -bl option." << endl;
-            help();
+    std::string sarg;
+    while ((c = getopt( argc, argv, "c:l:h") ) != -1) {
+        switch(c) {
+            case 'c':
+            arg.check.assign(optarg); break;
+            case 'l':
+            sarg.assign( optarg );
+            arg.bl = stoi( sarg ); break;
+            case 'h':
+            print_help(argv, arg); exit(1);
+            case '?':
+            cout << "Unknown option. Use -h for help." << endl;
+            exit(1);
         }
-
-		ptr++;
     }
-    else
-    {
-
-		cout << "Error: unknown option " << s << endl;
-		help();
-
-	}
-
+    // the only input parameter is the file name 
+    //if (argc == optind+1) {
+    //    arg.input_file.assign( argv[optind] );
+    //    if (!specify_out) arg.output_base.assign( argv[optind] );
+    //}
+    if (argc == optind+2) {
+        arg.idx_file.assign(argv[optind]);
+        arg.pattern_file.assign(argv[optind+1]);
+    }
+    else {
+        std::cout << "Invalid number of arguments" << std::endl;
+        print_help(argv,arg);
+    }
+    // check algorithm parameters 
+    //if(arg.bl < 0) {
+    //    std::cout << "bl must be nonnegative integer\n";
+    //    exit(1);
+    //}
 }
 
 template<class T>
-void locate_all(ifstream& in, string pattern_file)
+void locate_all(Args& args, ifstream& in, string pattern_file)
 {
     using std::chrono::high_resolution_clock;
     using std::chrono::duration_cast;
@@ -83,40 +88,37 @@ void locate_all(ifstream& in, string pattern_file)
     string text;
     bool c = false;
 
-    if (check.compare(string()) != 0)
+    if (args.check.compare(string()) != 0)
     {
         c = true;
 
-        ifstream ifs1(check);
+        ifstream ifs1(args.check);
         stringstream ss;
         ss << ifs1.rdbuf();
         text = ss.str();
     }
 
-    cout << "Loading fully functional br-index ... " << flush;
+    cout << "Loading br-index ... " << flush;
 
     auto t1 = high_resolution_clock::now();
 
     T idx;
 
-    if (length) idx.load(in,(int)length);
-    else idx.load(in);
+    if (args.bl == -1) idx.load(in);
+    else idx.load(in,args.bl);
 
     auto t2 = high_resolution_clock::now();
 
     cout << "done." << endl;
 
-    cout << "searching maximal exact matches ..." << endl;
-    
-    
-    
-
-    ifstream ifs(pattern_file);
+        
+    ifstream ifs(args.pattern_file);
 
     stringstream ssp;
     ssp << ifs.rdbuf();
     string p = ssp.str();
 
+    cout << "searching maximal exact matches ..." << endl;
 
     ulint m = p.size();
 
@@ -176,23 +178,13 @@ void locate_all(ifstream& in, string pattern_file)
 
 int main(int argc, char** argv)
 {
-    if (argc < 3) help();
+    Args arg;
+    parse_args(argc, argv, arg);
 
-    int ptr = 1;
+    ifstream in(arg.idx_file);
 
-    while (ptr < argc-2) parse_args(argv, argc, ptr);
-
-    string idx_file(argv[ptr]);
-    string patt_file(argv[ptr+1]);
-
-    char* e;
-
-    ifstream in(idx_file);
-
-
-    locate_all<br_index_full<> >(in, patt_file);
+    locate_all<br_index>(args, in, patt_file);
     
-
     in.close();
 
 }
