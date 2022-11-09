@@ -56,9 +56,9 @@ public:
     std::vector<ulint> locate_samples(std::vector<br_sample> const& samples);
     std::vector<ulint> locate_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples);
 
-    ulint count(std::string const& pattern);
-    std::vector<ulint> locate(std::string const& pattern);
-    void maximal_exact_match(std::string const& pattern);
+    ulint count(std::string const& pattern); // count(P)
+    std::vector<ulint> locate(std::string const& pattern); // locate(P)
+    void maximal_exact_match(std::string const& pattern); // MEMs
 
 
     // suffix tree operations

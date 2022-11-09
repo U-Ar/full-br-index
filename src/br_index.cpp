@@ -323,15 +323,13 @@ br_index::br_index(std::string const& input, ulint length=8, bool sais = true) {
     std::cout << " done.\n(5/5) Building bitvectors for contraction shortcut S_l, E_l, S_l^R, E_l^R (l<=bl) ..." << std::flush;
 
     // construct kmer_start, kmer_end
-    kmer_start = {};
-    kmer_end = {};
+    kmer = {};
     sdsl::int_vector<> lcp;
     sdsl::load_from_file(lcp, sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
     for (ulint k = 0; k < length; ++k) {
-        std::vector<bool> kmer_start_vector(text.size(),false);
-        std::vector<bool> kmer_end_vector(text.size(),false);
-        kmer_start_vector[0] = true;
-        kmer_end_vector[text.size()-1] = true;
+        std::vector<bool> kmer_vector(text.size()+1,false);
+        kmer_vector[0] = true;
+        kmer_vector[text.size()] = true;
 
         bool yet;
         uchar tmp;
@@ -344,41 +342,35 @@ br_index::br_index(std::string const& input, ulint length=8, bool sais = true) {
                 yet = true;
                 tmp = bwt_s[i-1];
             }
-            if (yet && lcp[i] < k)
-            {
+            if (yet && lcp[i] <= k) {
                 yet = false;
-                kmer_start_vector[i] = true;
+                kmer_vector[i] = true;
             }
         }
         yet = true;
         tmp = bwt_s[0];
-        for (ulint i = 0; i < bwt_s.size()-1; ++i)
-        {
-            if (bwt_s[i+1] != tmp) {
+        for (ulint i = 1; i < bwt_s.size(); ++i) {
+            if (bwt_s[i] != tmp) {
                 yet = true;
-                tmp = bwt_s[i+1];
+                tmp = bwt_s[i];
             }
-            if (yet && lcp[i+1] < k)
-            {
+            if (yet && lcp[i] <= k) {
                 yet = false;
-                kmer_end_vector[i] = true;
+                kmer_vector[i] = true;
             }
         }
 
-        kmer_start.push_back(sparse_bitvector_t(kmer_start_vector));
-        kmer_end.push_back(sparse_bitvector_t(kmer_end_vector));
+        kmer.push_back(sparse_bitvector_t(kmer_vector));
     }
 
-    // construct kmer_startR, kmer_endR
-    kmer_startR = {};
-    kmer_endR = {};
+    // construct kmerR
+    kmerR = {};
     sdsl::int_vector<> lcpR;
     sdsl::load_from_file(lcpR, sdsl::cache_file_name(sdsl::conf::KEY_LCP, ccR));
     for (ulint k = 0; k < length; ++k) {
-        std::vector<bool> kmer_start_vectorR(textR.size(),false);
-        std::vector<bool> kmer_end_vectorR(textR.size(),false);
-        kmer_start_vectorR[0] = true;
-        kmer_end_vectorR[textR.size()-1] = true;
+        std::vector<bool> kmer_vector(text.size()+1,false);
+        kmer_vector[0] = true;
+        kmer_vector[text.size()] = true;
 
         bool yet;
         uchar tmp;
@@ -391,29 +383,25 @@ br_index::br_index(std::string const& input, ulint length=8, bool sais = true) {
                 yet = true;
                 tmp = bwt_sR[i-1];
             }
-            if (yet && lcpR[i] < k)
-            {
+            if (yet && lcpR[i] <= k) {
                 yet = false;
-                kmer_start_vectorR[i] = true;
+                kmer_vector[i] = true;
             }
         }
         yet = true;
         tmp = bwt_sR[0];
-        for (ulint i = 0; i < bwt_sR.size()-1; ++i)
-        {
-            if (bwt_sR[i+1] != tmp) {
+        for (ulint i = 1; i < bwt_sR.size(); ++i) {
+            if (bwt_sR[i] != tmp) {
                 yet = true;
-                tmp = bwt_sR[i+1];
+                tmp = bwt_sR[i];
             }
-            if (yet && lcpR[i+1] < k)
-            {
+            if (yet && lcpR[i] <= k) {
                 yet = false;
-                kmer_end_vectorR[i] = true;
+                kmer_vector[i] = true;
             }
         }
 
-        kmer_startR.push_back(sparse_bitvector_t(kmer_start_vectorR));
-        kmer_endR.push_back(sparse_bitvector_t(kmer_end_vectorR));
+        kmerR.push_back(sparse_bitvector_t(kmer_vector));
     }
 
     // release LCP cache
