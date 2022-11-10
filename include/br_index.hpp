@@ -10,11 +10,8 @@
 #include "rle_string.hpp"
 #include "sparse_sd_vector.hpp"
 #include "permuted_lcp.hpp"
-#include "utils.hpp"
 
 namespace bri {
-
-class br_index_builder;
 
 class br_index {
     
@@ -23,10 +20,10 @@ public:
     using sparse_bitvector_t = sparse_sd_vector;
     using rle_string_t = rle_string<>;
 
-    friend br_index_builder;
+    friend class br_index_builder;
 
 
-    br_index();
+    br_index() {}
     br_index(std::string const& input, ulint length=8, bool sais = true);
 
     range_t full_range();
@@ -166,16 +163,12 @@ private:
 
     // left_contraction shorcut for |P|<=bl+1
     std::vector<sparse_bitvector_t> kmer;
-    //std::vector<sparse_bitvector_t> kmer_start;
-    //std::vector<sparse_bitvector_t> kmer_end;
 
     // right_contraction shortcut for |P|<=bl+1
     std::vector<sparse_bitvector_t> kmerR;
-    //std::vector<sparse_bitvector_t> kmer_startR;
-    //std::vector<sparse_bitvector_t> kmer_endR;
 
 };
 
-}
+}; // namespace bri
 
 #endif // INCLUDED_BR_INDEX_FULL_HPP

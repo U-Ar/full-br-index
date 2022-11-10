@@ -1,9 +1,16 @@
-#ifndef INCLUDED_BRI_UTILS_HPP
-#define INCLUDED_BRI_UTILS_HPP
-
-#include "definitions.hpp"
+#include"definitions.hpp"
 
 namespace bri {
+
+std::size_t range_hash::operator() (range_t const& range) const 
+{
+    auto hash1 = std::hash<ulint>()(range.first);
+    auto hash2 = std::hash<ulint>()(range.second);
+    std::size_t seed = 0;
+    seed ^= hash1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= hash2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    return seed;
+}
 
 std::string get_time(ulint time){
 
@@ -31,7 +38,6 @@ std::string get_time(ulint time){
 	}
 
 	return ss.str();
-
 }
 
 uchar bitsize(ulint x)
@@ -40,8 +46,8 @@ uchar bitsize(ulint x)
     return 64 - __builtin_clzll(x);
 }
 
-//parse pizza&chilli patterns header:
-void header_error(){
+//parse pizza&chilli patterns header
+void header_error() {
 	std::cout << "Error: malformed header in patterns file" << std::endl;
 	std::cout << "Take a look here for more info on the file format: http://pizzachili.dcc.uchile.cl/experiments.html" << std::endl;
 	exit(0);
@@ -62,7 +68,6 @@ ulint get_number_of_patterns(std::string header){
 	ulint n = std::atoi(header.substr(start_pos).substr(0,end_pos).c_str());
 
 	return n;
-
 }
 
 ulint get_patterns_length(std::string header){
@@ -83,6 +88,4 @@ ulint get_patterns_length(std::string header){
 
 }
 
-};
-
-#endif /* BRI_UTILS_HPP */
+}; // namespace bri

@@ -19,7 +19,6 @@
 #include <sdsl/wavelet_trees.hpp>
 #include <sdsl/lcp_bitcompressed.hpp>
 
-
 namespace bri {
 
 typedef uint64_t ulint;
@@ -29,18 +28,8 @@ typedef unsigned char uchar;
 
 typedef std::pair<ulint, ulint> range_t;
 
-struct range_hash
-{
-    std::size_t operator() (range_t const& range) const
-    {
-        auto hash1 = std::hash<ulint>()(range.first);
-        auto hash2 = std::hash<ulint>()(range.second);
-        std::size_t seed = 0;
-        seed ^= hash1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= hash2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
-    }
-
+struct range_hash {
+    std::size_t operator() (range_t const& range) const;
 };
 
 // sample maintained during the search
@@ -55,8 +44,8 @@ struct br_sample {
      */
     range_t range, rangeR;
     ulint j, d, len;
-    
-    br_sample(): range(), rangeR() {}
+
+    br_sample() {}
 
     br_sample(range_t range_, 
               range_t rangeR_,
@@ -70,19 +59,16 @@ struct br_sample {
               d(d_),
               len(len_) {}
 
-    void set_values(range_t range_, 
-                    range_t rangeR_,
-                    ulint j_,
-                    ulint d_,
-                    ulint len_)
+    inline void set_values(range_t range, 
+                    range_t rangeR,
+                    ulint j,
+                    ulint d,
+                    ulint len)
     {
-        range = range_;
-        rangeR = rangeR_;
-        j = j_;
-        d = d_;
-        len = len_;
+        this->range=range; this->rangeR=rangeR;
+        this->j=j;this->d=d;this->len=len;
     }
-
+    
     // the pattern does not exist
     inline bool is_invalid() const
     {
@@ -104,7 +90,14 @@ struct br_sample {
     {
         return range.second + 1 - range.first;
     }
+    
 };
+
+std::string get_time(ulint time);
+uchar bitsize(ulint x);
+void header_error();
+ulint get_number_of_patterns(std::string header);
+ulint get_patterns_length(std::string header);
 
 };
 

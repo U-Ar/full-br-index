@@ -3,7 +3,7 @@
 #include <fstream>
 #include <string>
 
-#include "../src/rle_string.hpp"
+#include "rle_string.hpp"
 
 using namespace bri;
 

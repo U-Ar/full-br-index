@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 
-#include "../src/permuted_lcp.hpp"
+#include "permuted_lcp.hpp"
 
 using namespace bri;
 using namespace sdsl;

@@ -4,7 +4,6 @@
 #include "rle_string.hpp"
 #include "sparse_sd_vector.hpp"
 #include "permuted_lcp.hpp"
-#include "utils.hpp"
 #include "br_index.hpp"
 extern "C" {
     #include "pfpbuilder/utils.h"
@@ -24,6 +23,8 @@ struct Args {
     bool inmemory = false;
     FILE *tmp_parse_file, *last_file, *sa_file; 
 };
+
+namespace bri {
 
 class br_index_builder {
     br_index idx;
@@ -72,7 +73,7 @@ public:
                 }
             }
             // build F column
-            for (ulint i = 0; i < 256; ++i) idx.F[i] = freqs[remap_inv[i]];
+            for (ulint i = 0; i < 256; ++i) idx.F[i] = freqs[idx.remap_inv[i]];
             for (ulint i = 255; i > 0; --i) idx.F[i] = idx.F[i-1];
             idx.F[0] = 0;
             for (ulint i = 1; i < 256; ++i) idx.F[i] += idx.F[i-1];
@@ -96,7 +97,7 @@ public:
         std::cout << "Reading SA samples at run boundaries ... " << std::flush;
 
         // read .ssa
-        FILE* file_ssa = open_aux_file(input,EXTSSA,"rb");
+        FILE* file_ssa = open_aux_file(input.c_str(),EXTSSA,"rb");
 
         idx.samples_first = sdsl::int_vector<>(r,0,log_n);
         idx.first_to_run = sdsl::int_vector<>(r,0,log_r);
@@ -106,7 +107,7 @@ public:
             for (ulint i = 0; i < r; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_ssa);
                 if (s!=1) die(".ssa read failed");
-                samples_first[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                idx.samples_first[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
@@ -114,14 +115,14 @@ public:
             std::vector<ulint> first_pos;
             for (ulint i = 0; i < r; ++i) {
                 first_pos.push_back(pos_run_pairs[i].first);
-                first_to_run[i] = pos_run_pairs[i].second;
+                idx.first_to_run[i] = pos_run_pairs[i].second;
             }
             idx.first = br_index::sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
         }
         fclose(file_ssa);
 
         // read.esa
-        FILE* file_esa = open_aux_file(input,EXTESA,"rb");
+        FILE* file_esa = open_aux_file(input.c_str(),EXTESA,"rb");
 
         idx.samples_last = sdsl::int_vector<>(r,0,log_n);
         idx.last_to_run = sdsl::int_vector<>(r,0,log_r);
@@ -131,7 +132,7 @@ public:
             for (ulint i = 0; i < r; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_esa);
                 if (s!=1) die(".esa read failed");
-                samples_last[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                idx.samples_last[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             idx.last_SA_val = *sa_val;
@@ -140,7 +141,7 @@ public:
             std::vector<ulint> last_pos;
             for (ulint i = 0; i < r; ++i) {
                 last_pos.push_back(pos_run_pairs[i].first);
-                last_to_run[i] = pos_run_pairs[i].second;
+                idx.last_to_run[i] = pos_run_pairs[i].second;
             }
             idx.last = br_index::sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
@@ -203,7 +204,7 @@ public:
             }
             ones.push_back(acc1);
 
-            idx.plcp = permuted_lcp(size,ones,zeros);
+            idx.plcp = permuted_lcp<>(size,ones,zeros);
         }
 
         std::cout << "done.\nBuilding kmer[0,bl) ... " << std::flush;
@@ -300,7 +301,7 @@ public:
         std::cout << "Reading SA^R samples at run boundaries ... " << std::flush;
 
         // read .rev.ssa
-        FILE* file_ssa_rev = open_aux_file(input_rev,EXTSSA,"rb");
+        FILE* file_ssa_rev = open_aux_file(input_rev.c_str(),EXTSSA,"rb");
 
         idx.samples_firstR = sdsl::int_vector<>(rR,0,log_n);
         idx.first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
@@ -310,7 +311,7 @@ public:
             for (ulint i = 0; i < rR; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_ssa_rev);
                 if (s!=1) die(".rev.ssa read failed");
-                samples_firstR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                idx.samples_firstR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
@@ -318,14 +319,14 @@ public:
             std::vector<ulint> first_pos;
             for (ulint i = 0; i < rR; ++i) {
                 first_pos.push_back(pos_run_pairs[i].first);
-                first_to_runR[i] = pos_run_pairs[i].second;
+                idx.first_to_runR[i] = pos_run_pairs[i].second;
             }
-            idx.firstR = sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
+            idx.firstR = br_index::sparse_bitvector_t(first_pos.cbegin(),first_pos.cend());
         }
         fclose(file_ssa_rev);
 
         // read .rev.esa
-        FILE* file_esa_rev = open_aux_file(input_rev,EXTESA,"rb");
+        FILE* file_esa_rev = open_aux_file(input_rev.c_str(),EXTESA,"rb");
 
         idx.samples_lastR = sdsl::int_vector<>(rR,0,log_n);
         idx.last_to_runR = sdsl::int_vector<>(rR,0,log_rR);
@@ -336,7 +337,7 @@ public:
             for (ulint i = 0; i < rR; ++i) {
                 size_t s = fread(sa_val,SABYTES,1,file_esa_rev);
                 if (s!=1) die(".rev.esa read failed");
-                samples_lastR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
+                idx.samples_lastR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
             last_SA_valR = *sa_val;
@@ -345,9 +346,9 @@ public:
             std::vector<ulint> last_pos;
             for (ulint i = 0; i < rR; ++i) {
                 last_pos.push_back(pos_run_pairs[i].first);
-                last_to_runR[i] = pos_run_pairs[i].second;
+                idx.last_to_runR[i] = pos_run_pairs[i].second;
             }
-            idx.lastR = sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
+            idx.lastR = br_index::sparse_bitvector_t(last_pos.cbegin(),last_pos.cend());
         }
         fclose(file_esa_rev);
 
@@ -408,7 +409,7 @@ public:
             }
             ones.push_back(acc1);
 
-            idx.plcpR = permuted_lcp(size,ones,zeros);
+            idx.plcpR = permuted_lcp<>(size,ones,zeros);
         }
 
         std::cout << "done.\nBuilding kmer^R[0,bl) ... " << std::flush;
@@ -488,6 +489,8 @@ public:
     }
 };
 
+}; // namespace bri
+
 void print_help(char** argv, Args &args) {
     std::cout << "Usage: " << argv[ 0 ] << " <input filename> [options]" << std::endl;
     std::cout << "Build br-index from Prefix-Free Parsed files." << std::endl;
@@ -529,7 +532,7 @@ void parse_args( int argc, char** argv, Args& arg ) {
             case 'i':
             arg.inmemory = true; break;
             case '?':
-            cout << "Unknown option. Use -h for help." << endl;
+            std::cout << "Unknown option. Use -h for help." << std::endl;
             exit(1);
         }
     }

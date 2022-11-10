@@ -7,8 +7,6 @@
 
 namespace bri {
 
-br_index::br_index() {}
-
 /*
 * constructor. 
 * \param input: string on which br-index is built

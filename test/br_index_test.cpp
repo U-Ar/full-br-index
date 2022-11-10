@@ -3,7 +3,7 @@
 #include <fstream>
 #include <string>
 
-#include "../src/br_index_full.hpp"
+#include "br_index.hpp"
 
 using namespace bri;
 using namespace std;
@@ -22,10 +22,10 @@ bool equal_set(vector<T>& v1, vector<U>& v2)
 
 }
 
-IUTEST(BrIndexTest, BasicLocate)
+IUTEST(BrIndexInmemoryTest, BasicLocate)
 {
     std::string s("aaaaaaaaaaaaaaaaaaaa");
-    br_index_full<> idx(s,1);
+    br_index idx(s,1);
     IUTEST_ASSERT_EQ(20,idx.text_size());
     IUTEST_ASSERT_EQ(21,idx.bwt_size());
     range_t range = idx.full_range();
@@ -50,10 +50,10 @@ IUTEST(BrIndexTest, BasicLocate)
 
 }
 
-IUTEST(BrIndexTest, PeriodicTextLocate)
+IUTEST(BrIndexInmemoryTest, PeriodicTextLocate)
 {
     std::string s("abcdabcdabcdabcdhello");
-    br_index_full<> idx(s,1);
+    br_index idx(s,1);
     auto vec = idx.locate("abcd");
     std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
@@ -63,10 +63,10 @@ IUTEST(BrIndexTest, PeriodicTextLocate)
 
 }
 
-IUTEST(BrIndexTest, PhiPhiI)
+IUTEST(BrIndexInmemoryTest, PhiPhiI)
 {
     std::string s("abcdabcdabcdabcdhello");
-    br_index_full<> idx(s,1);
+    br_index idx(s,1);
     IUTEST_EXPECT_EQ(21,idx.Phi(0));
     IUTEST_EXPECT_EQ(0,idx.Phi(4));
     IUTEST_EXPECT_EQ(4,idx.Phi(8));
@@ -101,10 +101,10 @@ IUTEST(BrIndexTest, PhiPhiI)
 
 
 
-IUTEST(BrIndexTest, DNALikeTextLocate)
+IUTEST(BrIndexInmemoryTest, DNALikeTextLocate)
 {
     std::string s("AAAATGCCGCCGCCATAAA");
-    br_index_full<> idx(s,1);
+    br_index idx(s,1);
 
     auto vec = idx.locate("C");
     std::sort(vec.begin(),vec.end());
@@ -128,20 +128,20 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
     IUTEST_EXPECT_EQ(11,vec[2]);
 }
 
-IUTEST(BrIndexTest, ExtensionContraction)
+IUTEST(BrIndexInmemoryTest, ExtensionContraction)
 {
     string input("abracadabra");
-    br_index_full<> idx(input,1,false);
+    br_index idx(input,1,false);
     auto init = idx.get_initial_sample();
     auto s = init;
 
-    s = idx.left_extension('a',init);
+    s = idx.left_extension(init,'a');
     {
         vector<ulint> exp{0,3,5,7,10};
         vector<ulint> loc(idx.locate_sample(s));
         IUTEST_ASSERT(equal_set<>(exp,loc));
     }
-    s = idx.left_extension('r',s);
+    s = idx.left_extension(s,'r');
     {
         vector<ulint> exp{2,9};
         vector<ulint> loc(idx.locate_sample(s));
@@ -156,13 +156,13 @@ IUTEST(BrIndexTest, ExtensionContraction)
     s = idx.left_contraction(s);
     IUTEST_EXPECT_EQ(12,s.size());
 
-    s = idx.right_extension('r',init);
+    s = idx.right_extension(init,'r');
     {
         vector<ulint> exp{2,9};
         vector<ulint> loc(idx.locate_sample(s));
         IUTEST_ASSERT(equal_set<>(exp,loc));
     }
-    s = idx.right_extension('a',s);
+    s = idx.right_extension(s,'a');
     {
         vector<ulint> exp{2,9};
         vector<ulint> loc(idx.locate_sample(s));
