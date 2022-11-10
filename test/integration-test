@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, time, argparse, subprocess, os.path
+import sys, time, argparse, subprocess, os, random
 
 Description = """
 br-index integration test script.
@@ -20,14 +20,101 @@ br-index integration test script.
 ただ、各インデックスファイルに対するテストは同じ内容になるので、ここからをC++実行ファイルで作成する
 
 
+テスト内容：
+
+- left-extension
+- right-extension
+- left-contraction
+- right-contraction
+窓を左から右へスライド、スライド長さはしんどさ考えると10000prefixか
+これを長さ2, 3, 4, 5, 10, 20, ..., 100 までやる
+事前にKRhashを登録しておいて数が分かるように
+=> right-extensionのみとleft-extensionのみで行うものと、
+=> left-contractionとright-extensionのテスト
+bl=0のやつについてはbl=10から
+
+50までのKRhashをすべて登録しておく
+
+100000を長さ50のパターンで分割してブロック分けする(最後が端数になったらそれは除外)
+それぞれのブロックについて、
+- left-extensionのみで長さ50まで, KRhashでカウントの一致確認、長さ10以上のときはlocateの妥当性も追加で
+    - 妥当でないならアウト
+    - そこからleft-contractionのみで最後まで、その全過程でlocateの妥当性
+    - right-contractionのみで最後まで、その全過程でlocateの妥当性
+- right-extensionのみで長さ50まで、その全過程でlocateの妥当性
+
+最初のブロックのみ長さ10以下のパターンでのlocateの妥当性も全確認する
+
+- MEMs
+左からと右から、それぞれMEMsを行う
+確かにMaximalになっていることも確認したいし、全locateが正しいことも確認したい
+
 
 
 """
 
-# absolute path of auxiliary executables
+# absolute path of related directories
 dirname = os.path.dirname(os.path.abspath(__file__))
-bigbwt_exe      =  os.path.join(dirname, "pfpbuilder", "bigbwt")
-build_exe       =  os.path.join(dirname, "pfpbuild")
-shasum_exe      =  "sha256sum"
+data_dir = os.path.join(dirname,"dataset")
+build_dir = os.path.abspath(os.path.join(dirname, os.pardir))
+temp_dir = os.path.join(dirname,"test-tmp")
+
+build_exe = os.path.join(build_dir, "bri-build")
 
 EXTIDX = ".bri"
+
+
+def main():
+    print("br-index integration test.")
+
+    logfile_name = os.path.join(dirname, "i-test.log")
+    print("Sending logging messages to file: i-test.log")
+
+    with open(logfile_name,"a") as logfile:
+
+        data_files = [(os.path.join(data_dir,x), os.path.join(temp_dir,x+".mut")) for x in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir,x)) and x.endswith(".txt")]
+
+        print("List of detected datasets:")
+        for (x,y) in data_files:
+            print("- "+x)
+        print()
+
+
+
+
+# get mutated text with given prob
+def mutate(source,p):
+    alpha = set()
+    for c in source:
+        if "\0" == c or "\1" == c or "\2" == c:
+            print("Error: contains reserved delimiter symbol.")
+            sys.exit(1)
+        alpha.add(c)
+    alphabet = list(alpha)
+
+    res = ""
+    sigma = len(alphabet)
+    for c in source:
+        if random.random() < p:
+            ri = random.randint(0,sigma-1)
+            while alphabet[ri] == c:
+                ri = random.randint(0,sigma-1)
+            res += alphabet[ri]
+        else:
+            res += c
+    return res
+
+# execute command: return True is everything OK, False otherwise
+def execute_command(command,logfile,logfile_name,env=None):
+    try:
+        #subprocess.run(command.split(),stdout=logfile,stderr=logfile,check=True,env=env)
+        subprocess.check_call(command.split(),stdout=logfile,stderr=logfile,env=env)
+    except subprocess.CalledProcessError:
+        print("Error executing command line:")
+        print("\t"+ command)
+        print("Check log file: " + logfile_name)
+        return False
+    return True
+
+if __name__ == "__main__":
+    main()

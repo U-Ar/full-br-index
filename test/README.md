@@ -22,7 +22,7 @@ make unit-tests
 
 ## Dataset used for integration tests
 
-In addition to the dataset described below, you can add texts to *dataset* directory.
+In addition to the dataset described below, you can add text files (.txt extension is necessary) to *dataset* directory.
 The br-index will be tested also on those texts.
 
 Testing on large files (>1GB) is not recommended; It'll take too much time and run out of memory.

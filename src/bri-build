@@ -57,7 +57,7 @@ def main():
             if args.v: command += " -v"
             print("==== In-memory br-index build. Command: ", command)
             if(execute_command(command,logfile,logfile_name)!=True):
-                return
+                sys.exit(1)
             print("==== Build complete")
             print("Elapsed time: {0:.4f}".format(time.time()-start))
             return
@@ -69,7 +69,7 @@ def main():
 
         print("======== Computing PFP forwards. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
-            return
+            sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
 
 
@@ -82,7 +82,7 @@ def main():
 
         print("======== Computing PFP backwards. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
-            return
+            sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
 
 
@@ -97,7 +97,7 @@ def main():
 
         print("======== Building br-index from PFP. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
-            return
+            sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
         total_time = time.time() - start0
 
@@ -124,7 +124,7 @@ def delete_temp_files(args,logfile,logfile_name):
         print("==== Deleting temporary files.") # no need to show the command
         command = "rm -f {file}.bwt {file}.ssa {file}.esa {file}.rev.bwt {file}.rev.ssa {file}.rev.esa".format(file=args.input)
         if(execute_command(command,logfile,logfile_name)!=True):
-            return
+            sys.exit(1)
 
 
 # compute hash digest for a file 

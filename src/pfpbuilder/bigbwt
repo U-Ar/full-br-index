@@ -53,7 +53,7 @@ def main():
   args = parser.parse_args()
   if args.S and (args.s or args.e) :
     print("You can either compute the full SA or a sample of it, not both. Exiting...")
-    return
+    sys.exit(1)
     
   logfile_name = args.input + ".log"
   print("Sending logging messages to file:", logfile_name)
@@ -76,7 +76,7 @@ def main():
     if args.r: command += " -r" # reversed parsing
     print("==== Parsing. Command:", command)
     if(execute_command(command,logfile,logfile_name)!=True):
-      return
+      sys.exit(1)
     print("Elapsed time: {0:.4f}".format(time.time()-start))
 
     # after parsing original text is not required
@@ -88,7 +88,7 @@ def main():
       # delete temporary parsing files 
       command = "rm -f {file}.parse_old {file}.last {file}.occ".format(file=args.input)
       if(execute_command(command,logfile,logfile_name)!=True):
-        return
+        sys.exit(1)
       print("==== Stopping after the parsing phase as requested")      
       return
     elif args.compress:
@@ -97,7 +97,7 @@ def main():
       command = "tar -cJf {file}.parse.txz {file}.parse {file}.dicz".format(file=args.input)
       print("==== Compressing. Command:", command)
       if(execute_command(command,logfile,logfile_name,env={"XZ_OPT":"-9"})!=True): 
-        return
+        sys.exit(1)
       print("Elapsed time: {0:.4f}".format(time.time()-start))
       delete_temp_files(args,logfile,logfile_name)
       print("==== Done: Parsing output xz-compressed as requested")
@@ -119,7 +119,7 @@ def main():
     if (args.t>0): command += " -t " + str(args.t)
     print("==== Computing BWT of parsing. Command:", command)
     if(execute_command(command,logfile,logfile_name)!=True):
-      return
+      sys.exit(1)
     print("Elapsed time: {0:.4f}".format(time.time()-start));      
     
     # ----------- compute final BWT using dictionary and BWT of parse    
@@ -145,7 +145,7 @@ def main():
     
     print("==== Computing final BWT. Command:", command)
     if(execute_command(command,logfile,logfile_name)!=True):
-      return
+      sys.exit(1)
     print("Elapsed time: {0:.4f}".format(time.time()-start))      
     print("Total construction time: {0:.4f}".format(time.time()-start0))      
 
@@ -181,7 +181,7 @@ def main():
           command = "{exe} {file}".format(exe = bwt_exe, file=args.input)
       print("==== Computing BWT using sacak. Command:", command)       
       if(execute_command(command,logfile,logfile_name)!=True):
-        return   
+        sys.exit(1)   
       print("Elapsed time: {0:.4f}".format(time.time()-start))    
       command = "cmp {file}.bwt {file}.Bwt".format(file=args.input)
       print("==== Comparing BWTs. Command:", command)
@@ -189,6 +189,7 @@ def main():
         print("BWTs match")
       else:
         print("BWTs differ")
+        sys.exit(1)
     # --- end checking ---
 
   print("==== Done")
@@ -199,19 +200,19 @@ def delete_temp_files(args,logfile,logfile_name):
       print("==== Deleting temporary files.") # no need to show the command
       command = "rm -f {file}.parse {file}.parse_old {file}.last {file}.bwlast {file}.dict {file}.ilist {file}.occ".format(file=args.input)
       if(execute_command(command,logfile,logfile_name)!=True):
-        return
+        sys.exit(1)
       for i in range(args.t):
         command = "rm -f {file}.{i}.parse_old {file}.{i}.last".format(file=args.input, i=i)
         if(execute_command(command,logfile,logfile_name)!=True):
-          return
+          sys.exit(1)
       if args.s or args.S:
         command = "rm -f {file}.sai {file}.bwsai".format(file=args.input);
         if(execute_command(command,logfile,logfile_name)!=True):
-          return
+          sys.exit(1)
         for i in range(args.t):
           command = "rm -f {file}.{i}.sai".format(file=args.input, i=i)
           if(execute_command(command,logfile,logfile_name)!=True):
-            return
+            sys.exit(1)
 
 
 # compute hash digest for a file 
