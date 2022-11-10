@@ -2,13 +2,14 @@
 
 ## About
 
-br-index test suites.
+br-index unit test suite.
 
 ## How to run
 
-In order to build and run all tests, move to build directory and execute
+In order to build and run all tests, move to *build* directory and execute
 ```
-make test-bri
+cmake ..
+make unit-tests
 ```
 
 ## List of tests
@@ -17,4 +18,4 @@ make test-bri
 - HuffmanStringTest
 - RleStringTest
 - PermutedLcpTest
-- BrIndexTest
+- BrIndexInmemoryTest
