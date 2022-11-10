@@ -17,7 +17,7 @@ ADD_CUSTOM_TARGET(
 )
 ADD_CUSTOM_COMMAND(
     OUTPUT
-        ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h  # fake! ensure we run!
+        ${CMAKE_CURRENT_BINARY_DIR}/__nothing.h  # fake file to ensure we run the command
 	COMMAND make 
 	WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/pfpbuilder"
 	COMMENT "Build external PFPbuilder source."
@@ -25,10 +25,6 @@ ADD_CUSTOM_COMMAND(
 
 # copy bri-build(Python script) to binary dir
 FILE(COPY "${CMAKE_SOURCE_DIR}/src/bri-build" DESTINATION "${CMAKE_BINARY_DIR}")
-
-# include&link sdsl's location
-INCLUDE_DIRECTORIES(${SDSL_INCLUDE}) 
-LINK_DIRECTORIES(${SDSL_LIB}) 
 
 SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_FLAGS_DEBUG          "-O0 -g -ggdb")
@@ -40,6 +36,9 @@ SET(CMAKE_C_FLAGS_DEBUG          "-O0 -g -ggdb")
 SET(CMAKE_C_FLAGS_RELEASE        "-Ofast -march=native -DNDEBUG")
 SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-Ofast -march=native -g -ggdb")
 
+# include&link sdsl's location
+INCLUDE_DIRECTORIES(${SDSL_INCLUDE}) 
+LINK_DIRECTORIES(${SDSL_LIB}) 
 
 INCLUDE_DIRECTORIES("${CMAKE_SOURCE_DIR}/include")
 
@@ -77,27 +76,25 @@ TARGET_LINK_LIBRARIES(pfpbuild sdsl)
 TARGET_LINK_LIBRARIES(pfpbuild divsufsort)
 TARGET_LINK_LIBRARIES(pfpbuild divsufsort64)
 
-
-# unit tests
-ADD_EXECUTABLE(run_tests
-	test/run_tests.cpp 
-	test/br_index_test.cpp
-	test/sparse_sd_vector_test.cpp 
-	test/huffman_string_test.cpp
-	test/rle_string_test.cpp
-	test/permuted_lcp_test.cpp
-)
-TARGET_LINK_LIBRARIES(run_tests PRIVATE brindex sdsl divsufsort divsufsort64)
-
-TARGET_INCLUDE_DIRECTORIES(run_tests PRIVATE ${PROJECT_SOURCE_DIR}/external/iutest/include)
-
+ADD_SUBDIRECTORY(test)
 
 ADD_CUSTOM_TARGET(unit-tests
 	COMMAND rm -rf test-tmp
-	COMMAND mkdir test-tmp
+	COMMAND mkdir test-tmp # Temporary dir to put files for tests
 	COMMAND ./run_tests
-	COMMAND rm -rf test-tmp
+	COMMAND rm -rf *.sdsl
+	# COMMAND rm -rf test-tmp 
 	DEPENDS run_tests
-	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-	COMMENT "Execute run_tests."
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test
+	COMMENT "Execute unit tests."
+)
+
+ADD_CUSTOM_TARGET(integration-tests
+	COMMAND rm -rf test-tmp
+	COMMAND mkdir test-tmp # Temporary dir to put files for tests
+	COMMAND ./integration-test
+	# COMMAND rm -rf test-tmp
+	DEPENDS pfpbuild 
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test
+	COMMENT "Execute integration tests."
 )
