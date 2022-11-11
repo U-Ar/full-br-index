@@ -2,11 +2,11 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <vector>
+#include <map>
 
 using namespace bri;
 using namespace std;
-
-const ulint LENGTH = 50;
 
 struct KR_window {
   int wsize;
@@ -71,13 +71,109 @@ ulint kr_hash(string const& s) {
     return hash; 
 }
 
+// get frequencies of substrings of length <= max_len 
+// keys are Karp-Rabin hash
+map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
+{
+    vector<KR_window> windows(max_len);
+    for (ulint l = 1; l <= max_len; ++l) windows[l-1] = KR_window(l);
+
+    map<ulint,ulint> hash_table;
+
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        for (ulint l = 1; l <= max_len; ++l) 
+        {
+            ulint hash = windows[l-1].addchar(text[i]); 
+            if (i >= l-1) {
+                // increment hash table's freq
+                if (hash_table.find(hash)==hash_table.end()) {
+                    hash_table[hash] = 1;
+                } else {
+                    hash_table[hash]++;
+                }
+            }
+        }
+    }
+
+    return hash_table;
+}
+
 int main(int argc, char** argv)
 {
-    if (arc != 4) { cout << "Invalid command line argument." << endl; exit(1); }
+    if (arc != 4) { cerr << "Invalid command line argument. Exitting ... " << endl; exit(1); }
+
+    const ulint LENGTH = 50;
+
+    const string EXTIDX = ".bri";
+    const string EXTIN = ".in";
+    const string EXTPFP = ".pfp";
 
     string input_file = argv[1];
     string idx_file = argv[2];
     long bl = stoi(argv[3]);
+
+    cout << "==== Test1 on " << input_file;
+    if (idx_file.find(EXTIN+EXTIDX) != string::npos) cout << " with in-memory construction, ";
+    else cout << " with PFP construction, ";
+    cout << "bl=" << bl << endl;
+
+
+    // read input file
+    ifstream fin(input_file);
+    if (!fin.is_open()) {
+        cerr << "Text file " << input_file << " is not found. Exitting ... " << endl; exit(1);
+    }
+    string text;
+    while (!fin.eof()) text.push_back(fin.get());
+    fin.close();
+
+
+    // compute KR hash
+    cout << "Count frequencies of substrings of length <= " << LENGTH << endl;
+    map<ulint,ulint> freqs = kr_freqs(text, LENGTH);
+    
+
+    // read index file
+    ifstream fidx(idx_file);
+    if (!fidx.is_open()) {
+        cerr << "Index file " << idx_file << " is not found. Exitting ... " << endl; exit(1);
+    }
+    cout << "Loading " << idx_file << " with bl = " << bl << endl;
+    br_index idx;
+    idx.load(fidx,bl);
+
+    if (idx.text_size() != text.size()) {
+        cerr << "Text size and index's text size differ." << endl;
+        cerr << "Text size:         " << text.size() << endl;
+        cerr << "Index's text size: " << idx.text_size() << "  Exitting ..." << endl;
+        exit(1);
+    }
+
+    // count index size
+    ulint idx_size = idx.get_space();
+    cout << "Index size: " << idx_size << " bytes" << endl;
+
+
+    ulint fragments = text.size() / LENGTH;
+    cout << "Divide texts into " << fragments << " substrings" << endl;
+    cout << "Substring length: " << LENGTH << endl;
+
+    // test for each fragment
+    for (ulint k = 0; k < fragments; ++k) {
+        string pattern = text.substr(k*LENGTH,LENGTH);
+
+    }
+
+
+
+
+
+
+
+
+
+
 
 
 }
