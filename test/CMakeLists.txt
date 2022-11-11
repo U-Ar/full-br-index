@@ -14,6 +14,13 @@ TARGET_INCLUDE_DIRECTORIES(run_tests PRIVATE ${PROJECT_SOURCE_DIR}/external/iute
 
 # ---- integration tests ----
 
-# copy dataset to build/test/dataset
+ADD_EXECUTABLE(itest1 itest1.cpp)
+TARGET_LINK_LIBRARIES(itest1 PRIVATE brindex sdsl divsufsort divsufsort64)
+ADD_EXECUTABLE(itest2 itest1.cpp)
+TARGET_LINK_LIBRARIES(itest2 PRIVATE brindex sdsl divsufsort divsufsort64)
+
+# copy dataset & testing Python script to build/test/dataset
 FILE(COPY dataset DESTINATION ${CMAKE_BINARY_DIR}/test)
+FILE(COPY integration-test DESTINATION ${CMAKE_BINARY_DIR}/test)
+
 

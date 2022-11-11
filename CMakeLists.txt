@@ -83,7 +83,6 @@ ADD_CUSTOM_TARGET(unit-tests
 	COMMAND mkdir test-tmp # Temporary dir to put files for tests
 	COMMAND ./run_tests
 	COMMAND rm -rf *.sdsl
-	# COMMAND rm -rf test-tmp 
 	DEPENDS run_tests
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test
 	COMMENT "Execute unit tests."
@@ -93,8 +92,7 @@ ADD_CUSTOM_TARGET(integration-tests
 	COMMAND rm -rf test-tmp
 	COMMAND mkdir test-tmp # Temporary dir to put files for tests
 	COMMAND ./integration-test
-	# COMMAND rm -rf test-tmp
-	DEPENDS pfpbuild 
+	DEPENDS pfpbuild itest1 itest2 # Executables necessary for tests
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test
 	COMMENT "Execute integration tests."
 )
