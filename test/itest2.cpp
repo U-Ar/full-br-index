@@ -13,53 +13,64 @@ using namespace std;
 const ulint LENGTH = 50;
 
 struct KR_window {
-  int wsize;
-  int *window;
-  int asize;
-  // const ulint prime = 1999999973;
-  const ulint prime = 27162335252586509;
-  ulint hash;
-  ulint tot_char;
-  ulint asize_pot;   // asize^(wsize-1) mod prime 
-  
-  KR_window(int w): wsize(w) {
-    asize = 256;
-    asize_pot = 1;
-    for(int i=1;i<wsize;i++) 
-      asize_pot = (asize_pot*asize)% prime; // ugly linear-time power algorithm  
-    // alloc and clear window
-    window = new int[wsize];
-    reset();     
-  }
-  
-  // init window, hash, and tot_char 
-  void reset() {
-    for(int i=0;i<wsize;i++) window[i]=0;
-    // init hash value and related values
-    hash=tot_char=0;    
-  }
-  
-  ulint addchar(int c) {
-    int k = tot_char++ % wsize;
-    // complex expression to avoid negative numbers 
-    hash += (prime - (window[k]*asize_pot) % prime); // remove window[k] contribution  
-    hash = (asize*hash + c) % prime;      //  add char i 
-    window[k]=c;
-    // cerr << get_window() << " ~~ " << window << " --> " << hash << endl;
-    return hash; 
-  }
-  // debug only 
-  string get_window() {
-    string w = "";
-    int k = (tot_char-1) % wsize;
-    for(int i=k+1;i<k+1+wsize;i++)
-      w.append(1,window[i%wsize]);
-    return w;
-  }
-  
-  ~KR_window() {
-    delete[] window;
-  } 
+    int wsize;
+    int *window;
+    int asize;
+    // const ulint prime = 1999999973;
+    const ulint prime = 27162335252586509;
+    ulint hash;
+    ulint tot_char;
+    ulint asize_pot;   // asize^(wsize-1) mod prime 
+    
+    KR_window(int w): wsize(w) {
+        asize = 256;
+        asize_pot = 1;
+        for(int i=1;i<wsize;i++) 
+        asize_pot = (asize_pot*asize)% prime; // ugly linear-time power algorithm  
+        // alloc and clear window
+        window = new int[wsize];
+        reset();     
+    }
+
+    void resize(int w) {
+        wsize = w;
+        asize = 256;
+        asize_pot = 1;
+        for(int i=1;i<wsize;i++) 
+        asize_pot = (asize_pot*asize)% prime;
+        delete[] window;
+        window = new int[wsize];
+        reset();
+    }
+    
+    // init window, hash, and tot_char 
+    void reset() {
+        for(int i=0;i<wsize;i++) window[i]=0;
+        // init hash value and related values
+        hash=tot_char=0;    
+    }
+    
+    ulint addchar(int c) {
+        int k = tot_char++ % wsize;
+        // complex expression to avoid negative numbers 
+        hash += (prime - (window[k]*asize_pot) % prime); // remove window[k] contribution  
+        hash = (asize*hash + c) % prime;      //  add char i 
+        window[k]=c;
+        // cerr << get_window() << " ~~ " << window << " --> " << hash << endl;
+        return hash; 
+    }
+    // debug only 
+    string get_window() {
+        string w = "";
+        int k = (tot_char-1) % wsize;
+        for(int i=k+1;i<k+1+wsize;i++)
+        w.append(1,window[i%wsize]);
+        return w;
+    }
+    
+    ~KR_window() {
+        delete[] window;
+    } 
 
 };
 
@@ -79,8 +90,8 @@ ulint kr_hash(string const& s) {
 // keys are Karp-Rabin hash
 map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
 {
-    vector<KR_window> windows(max_len);
-    for (ulint l = 1; l <= max_len; ++l) windows[l-1] = KR_window(l);
+    vector<KR_window> windows(max_len,KR_window(1));
+    for (ulint l = 1; l <= max_len; ++l) windows[l-1].resize(l);
 
     map<ulint,ulint> hash_table;
 
@@ -104,7 +115,7 @@ map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
 }
 
 bool verify(string const& text, br_index& idx, br_sample const& sample,
-    string const& pattern, map<ulint, ulint> const& freqs,
+    string const& pattern, map<ulint, ulint>& freqs,
     ulint i, ulint l, bool rightward)
 {
     bool ok = true;
@@ -115,11 +126,11 @@ bool verify(string const& text, br_index& idx, br_sample const& sample,
         ulint cnt = idx.count_sample(sample);
 
         // check frequency of substring
-        if (freqs.find(hash)==freqs.end() || freqs[hash]!=cnt)
+        if (freqs.find(hash)==freqs.end() || freqs.at(hash)!=cnt)
         {
             cerr << "Error at " << opname << ", position " << i << ", length " << l << "." << endl;
             cerr << "  Numbers of substring " << pattern.substr(i,l) << " differ." << endl;
-            cerr << "  KR hash  : " << (freqs.find(hash)==freqs.end() ? 0 freqs[hash]) << endl;
+            cerr << "  KR hash  : " << (freqs.find(hash)==freqs.end() ? 0 : freqs.at(hash)) << endl;
             cerr << "  br-index : " << cnt;
             return false;
         }
@@ -189,7 +200,7 @@ int main(int argc, char** argv)
 
     auto t1 = clock::now();
 
-    if (arc != 5) { cout << "Invalid command line argument. Exitting ... " << endl; exit(1); }
+    if (argc != 5) { cout << "Invalid command line argument. Exitting ... " << endl; exit(1); }
 
     const string EXTIDX = ".bri";
     const string EXTIN = ".in";
@@ -338,6 +349,6 @@ int main(int argc, char** argv)
     cout << "==== Test2 on " << input_file << " finished" << endl;
     cout << "     Elapsed time: " 
          << fixed << setprecision(4) 
-         << (double)duration_cast<chrono::milliseconds>(t2-t1).count()/1000
+         << (double)chrono::duration_cast<chrono::milliseconds>(t2-t1).count()/1000
          << endl;
 }

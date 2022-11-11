@@ -288,6 +288,7 @@ public:
         std::cout << "Building RLBWT^R ... " << std::flush;
 
         // build RLBWT^R with remapper
+        fbwt_rev.seekg(0);
         idx.bwtR.load_from_plain(fbwt_rev,size,idx.remap);
         fbwt_rev.close();
         assert(size==idx.bwtR.size());
@@ -568,7 +569,7 @@ int main(int argc, char** argv) {
         br_index idx(input,arg.bl,false);
 
         std::cout << "Saving br-index to " << arg.output_base + EXTIDX << " ... " << std::flush;
-        std::ofstream f(arg.output_base + EXTIDX);
+        std::ofstream f(arg.output_base + "." + EXTIDX);
         ulint bytes = idx.serialize(f);
         std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
 
