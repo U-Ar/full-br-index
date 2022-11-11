@@ -28,18 +28,18 @@ public:
 
     range_t full_range();
     ulint LF(ulint i);
-    range_t LF(range_t rn, uchar c);
+    range_t LF(range_t rn, uchar c); // c: remapped char
     ulint LFR(ulint i);
-    range_t LFR(range_t rn, uchar c);
+    range_t LFR(range_t rn, uchar c); // c: remapped char
     ulint FL(ulint i);
     ulint FLR(ulint i);
     ulint Phi(ulint i);
-    ulint PhiI(ulint i);
     ulint PhiR(ulint i);
+    ulint PhiI(ulint i);
     ulint PhiIR(ulint i);
 
     uchar F_at(ulint i);
-    range_t get_char_range(uchar c);
+    range_t get_char_range(uchar c); // c: remapped char
 
 
     // search initialization

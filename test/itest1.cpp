@@ -2,11 +2,15 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <map>
+#include <chrono>
 
 using namespace bri;
 using namespace std;
+
+const ulint LENGTH = 50;
 
 struct KR_window {
   int wsize;
@@ -123,7 +127,7 @@ bool verify(string const& text, br_index& idx, br_sample const& sample, string c
     if (pattern.size() < 10 && frag_num > 10) return ok;
 
     vector<ulint> positions(idx.locate_sample(sample));
-    if (positions.size() != cnt.size()) {
+    if (positions.size() != cnt) {
         cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
         cerr << "  Size of location vector differ from count val." << endl;
         return false;
@@ -155,9 +159,11 @@ bool verify(string const& text, br_index& idx, br_sample const& sample, string c
 
 int main(int argc, char** argv)
 {
-    if (arc != 4) { cerr << "Invalid command line argument. Exitting ... " << endl; exit(1); }
+    using clock = chrono::high_resolution_clock;
 
-    const ulint LENGTH = 50;
+    auto t1 = clock::now();
+
+    if (arc != 4) { cerr << "Invalid command line argument. Exitting ... " << endl; exit(1); }
 
     const string EXTIDX = ".bri";
     const string EXTIN = ".in";
@@ -193,9 +199,11 @@ int main(int argc, char** argv)
     if (!fidx.is_open()) {
         cerr << "Index file " << idx_file << " is not found. Exitting ... " << endl; exit(1);
     }
-    cout << "Loading " << idx_file << " with bl = " << bl << endl;
+    cout << "Loading " << idx_file << " with bl = " << bl << " ... " << flush;
     br_index idx;
     idx.load(fidx,bl);
+    fidx.close();
+    cout << "done." << endl;
 
     if (idx.text_size() != text.size()) {
         cerr << "Text size and index's text size differ." << endl;
@@ -219,7 +227,7 @@ int main(int argc, char** argv)
         assert(pattern.size() == LENGTH);
 
         br_sample sample(idx.get_initial_sample());
-        bool ok;
+        bool ok=true;
 
         // left-extension
         for (ulint i = LENGTH; i-->0; ) {
@@ -251,6 +259,13 @@ int main(int argc, char** argv)
         }
 
     }
-    cout << "==== Test1 on " << input_file << " finished";
+
+    auto t2 = clock::now();
+
+    cout << "==== Test1 on " << input_file << " finished" << endl;
+    cout << "     Elapsed time: " 
+         << fixed << setprecision(4) 
+         << (double)duration_cast<chrono::milliseconds>(t2-t1).count()/1000
+         << endl;
 
 }
