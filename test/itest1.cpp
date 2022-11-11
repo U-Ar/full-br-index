@@ -99,6 +99,60 @@ map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
     return hash_table;
 }
 
+bool verify(string const& text, br_index& idx, br_sample const& sample, string const& pattern, 
+    map<ulint, ulint> const& freqs, 
+    ulint frag_num, ulint step, string const& opname)
+{
+    ulint hash = kr_hash(pattern);
+    ulint cnt = idx.count_sample(sample);
+
+    bool ok = true;
+
+    // check frequency of substring
+    if (freqs.find(hash)==freqs.end() || freqs[hash]!=cnt)
+    {
+        cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
+        cerr << "  Numbers of substring " << pattern << " differ." << endl;
+        cerr << "  KR hash  : " << (freqs.find(hash)==freqs.end() ? 0 freqs[hash]) << endl;
+        cerr << "  br-index : " << cnt;
+        return false;
+    }
+
+    // check the correctness of locate(P) with |P|<10
+    // only for first 10 fragments (cause it takes much time)
+    if (pattern.size() < 10 && frag_num > 10) return ok;
+
+    vector<ulint> positions(idx.locate_sample(sample));
+    if (positions.size() != cnt.size()) {
+        cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
+        cerr << "  Size of location vector differ from count val." << endl;
+        return false;
+    }
+
+    for (ulint pos : positions) {
+        // check text position overflow
+        if (pos+pattern.size()>text.size()) {
+            cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
+            cerr << "  Pattern starting from located pos overflows text size." << endl;
+            cerr << "  pos: " << pos << " pattern: " << pattern << " textsize: " << text.size() << endl;
+            ok = false; continue;
+        }
+
+        // check the match between the pattern and located substrings
+        string reference = text.substr(pos,pattern.size());
+        if (pattern != reference) {
+           cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
+            cerr << "  Substring starting from located pos differ from the pattern." << endl;
+            cerr << "  Pos : " << pos << endl;
+            cerr << "  Substring at pos        : " << reference << endl;
+            cerr << "  Pattern we are searching: " << pattern << endl;
+            ok = false;
+        }
+    }
+
+    return ok;
+}
+
 int main(int argc, char** argv)
 {
     if (arc != 4) { cerr << "Invalid command line argument. Exitting ... " << endl; exit(1); }
@@ -162,18 +216,41 @@ int main(int argc, char** argv)
     // test for each fragment
     for (ulint k = 0; k < fragments; ++k) {
         string pattern = text.substr(k*LENGTH,LENGTH);
+        assert(pattern.size() == LENGTH);
+
+        br_sample sample(idx.get_initial_sample());
+        bool ok;
+
+        // left-extension
+        for (ulint i = LENGTH; i-->0; ) {
+            sample = idx.left_extension(sample,pattern[i]);
+            ok = verify(text,idx,sample,pattern.substr(i,LENGTH-i),freqs,k,LENGTH-i,"left-extension");
+        }
+
+        // left-contraction
+        if (ok) {
+            for (ulint i = 1; i < LENGTH; ++i) {
+                sample = idx.left_contraction(sample);
+                ok = verify(text,idx,sample,pattern.substr(i,LENGTH-i),freqs,k,i-1,"left-contraction");
+            }
+        }
+
+        // right-extension
+        sample = idx.get_initial_sample();
+        for (ulint i = 0; i < LENGTH; ++i) {
+            sample = idx.right_extension(sample,pattern[i]);
+            ok = verify(text,idx,sample,pattern.substr(0,i+1),freqs,k,i,"right-extension");
+        }
+
+        // right-contraction
+        if (ok) {
+            for (ulint i = 0; i < LENGTH-1; ++i) {
+                sample = idx.right_contraction(sample);
+                ok = verify(text,idx,sample,pattern.substr(0,LENGTH-i-1),freqs,k,i,"right-contraction");
+            }
+        }
 
     }
-
-
-
-
-
-
-
-
-
-
-
+    cout << "==== Test1 on " << input_file << " finished";
 
 }
