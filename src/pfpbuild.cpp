@@ -11,6 +11,13 @@ extern "C" {
 
 using namespace bri;
 
+template<class T>
+void print_vec(std::vector<T> const& vec) {
+    for (auto x : vec) {
+        std::cout << (ulint) x << " ";
+    } std::cout << std::endl;
+}
+
 // index file extension
 const std::string EXTIDX = "bri";
 
@@ -34,6 +41,7 @@ public:
     br_index_builder& build_from_pfp(std::string const& input, int bl) {
 
         std::cout << "Building br-index on " << input << std::endl;
+        std::cout << "  using PFP parsing files." << std::endl;
 
         idx = br_index();
         idx.length = (ulint)bl;
@@ -78,6 +86,8 @@ public:
             idx.F[0] = 0;
             for (ulint i = 1; i < 256; ++i) idx.F[i] += idx.F[i-1];
         }
+        assert(idx.remap[0] == 1);
+        assert(idx.remap_inv[1] == 0);
 
         std::cout << "done.\nBuilding RLBWT ... " << std::flush;
 
@@ -103,13 +113,24 @@ public:
         idx.first_to_run = sdsl::int_vector<>(r,0,log_r);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(r);
-            ulint* sa_val;
+            /*ulint* sa_val;
             for (ulint i = 0; i < r; ++i) {
+                fread(sa_val,SABYTES,1,file_ssa);
                 size_t s = fread(sa_val,SABYTES,1,file_ssa);
                 if (s!=1) die(".ssa read failed");
                 idx.samples_first[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
+            }*/
+            ulint* buf = new ulint[2];
+            for (ulint i = 0; i < r; ++i) {
+                size_t s = fread(buf, SABYTES, 2, file_ssa);
+                if (s!=2) die(".ssa read failed.");
+                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                idx.samples_first[i] = sa_val;
+                pos_run_pairs[i] = {sa_val,i};
             }
+            delete[] buf;
+
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> first_pos;
@@ -128,14 +149,27 @@ public:
         idx.last_to_run = sdsl::int_vector<>(r,0,log_r);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(r);
-            ulint* sa_val;
+            /* ulint* sa_val;
             for (ulint i = 0; i < r; ++i) {
+                fread(sa_val,SABYTES,1,file_esa);
                 size_t s = fread(sa_val,SABYTES,1,file_esa);
                 if (s!=1) die(".esa read failed");
                 idx.samples_last[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
-            idx.last_SA_val = *sa_val;
+            idx.last_SA_val = *sa_val;*/
+            ulint* buf = new ulint[2];
+            for (ulint i = 0; i < r; ++i) {
+                size_t s = fread(buf, SABYTES, 2, file_esa);
+                if (s!=2) die(".esa read failed.");
+                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                idx.samples_last[i] = sa_val;
+                pos_run_pairs[i] = {sa_val,i};
+            }
+            idx.last_SA_val = buf[1];
+            delete[] buf;
+
+
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> last_pos;
@@ -308,13 +342,24 @@ public:
         idx.first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
-            ulint* sa_val;
+            /*ulint* sa_val;
             for (ulint i = 0; i < rR; ++i) {
+                fread(sa_val,SABYTES,1,file_ssa_rev);
                 size_t s = fread(sa_val,SABYTES,1,file_ssa_rev);
                 if (s!=1) die(".rev.ssa read failed");
                 idx.samples_firstR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
+            }*/
+            ulint* buf = new ulint[2];
+            for (ulint i = 0; i < rR; ++i) {
+                size_t s = fread(buf, SABYTES, 2, file_ssa_rev);
+                if (s!=2) die(".rev.ssa read failed.");
+                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                idx.samples_firstR[i] = sa_val;
+                pos_run_pairs[i] = {sa_val,i};
             }
+            delete[] buf;
+
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> first_pos;
@@ -334,14 +379,26 @@ public:
         ulint last_SA_valR; // temporary
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
-            ulint* sa_val;
+            /*ulint* sa_val;
             for (ulint i = 0; i < rR; ++i) {
+                fread(sa_val,SABYTES,1,file_esa_rev);
                 size_t s = fread(sa_val,SABYTES,1,file_esa_rev);
                 if (s!=1) die(".rev.esa read failed");
                 idx.samples_lastR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
                 pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
             }
-            last_SA_valR = *sa_val;
+            last_SA_valR = *sa_val;*/
+            ulint* buf = new ulint[2];
+            for (ulint i = 0; i < rR; ++i) {
+                size_t s = fread(buf, SABYTES, 2, file_esa_rev);
+                if (s!=2) die(".rev.ssa read failed.");
+                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                idx.samples_lastR[i] = sa_val;
+                pos_run_pairs[i] = {sa_val,i};
+            }
+            last_SA_valR = buf[1];
+            delete[] buf;
+
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
 
             std::vector<ulint> last_pos;

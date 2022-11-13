@@ -24,7 +24,7 @@ ADD_CUSTOM_COMMAND(
 )
 
 # copy bri-build(Python script) to binary dir
-FILE(COPY "${CMAKE_SOURCE_DIR}/src/bri-build" DESTINATION "${CMAKE_BINARY_DIR}")
+CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/src/bri-build ${CMAKE_BINARY_DIR}/bri-build COPYONLY)
 
 SET(CMAKE_CXX_STANDARD 11)
 SET(CMAKE_CXX_FLAGS_DEBUG          "-O0 -g -ggdb")

@@ -63,7 +63,7 @@ def main():
             return
 
         # ---- compute .bwt, .ssa, .esa with PFP
-        command = "{exe} {file} -w {wsize} -p {modulus} -t {th}".format(exe=bigbwt_exe,
+        command = "{exe} {file} -w {wsize} -p {modulus} -t {th} -s -e".format(exe=bigbwt_exe,
             wsize=args.wsize, modulus=args.mod, th=args.t, file=args.input)
         if args.v: command += " -v"
 
@@ -76,7 +76,7 @@ def main():
         # ---- compute .rev.bwt, .rev.ssa, .rev.esa with PFP
         start = time.time()
 
-        command = "{exe} {file} -w {wsize} -p {modulus} -t {th} -r".format(exe=bigbwt_exe,
+        command = "{exe} {file} -w {wsize} -p {modulus} -t {th} -r -s -e".format(exe=bigbwt_exe,
             wsize=args.wsize, modulus=args.mod, th=args.t, file=args.input)
         if args.v: command += " -v"
 

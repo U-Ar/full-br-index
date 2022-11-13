@@ -21,6 +21,4 @@ TARGET_LINK_LIBRARIES(itest2 PRIVATE brindex sdsl divsufsort divsufsort64)
 
 # copy dataset & testing Python script to build/test/dataset
 FILE(COPY dataset DESTINATION ${CMAKE_BINARY_DIR}/test)
-FILE(COPY integration-test DESTINATION ${CMAKE_BINARY_DIR}/test)
-
-
+CONFIGURE_FILE(integration-test ${CMAKE_BINARY_DIR}/test/integration-test COPYONLY)

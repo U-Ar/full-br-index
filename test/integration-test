@@ -71,7 +71,8 @@ EXTPFP = ".pfp"
 MUT_PROB = 0.05
 
 def main():
-    print("br-index integration test.")
+    print("=-=-= br-index integration test. =-=-=")
+    print()
     print("Datasets are read from {}".format(data_dir))
     print("Index files and temporary files will be put to {}".format(temp_dir))
 
@@ -84,9 +85,10 @@ def main():
     with open(logfile_name,"a") as logfile:
 
         data_files = [(os.path.join(data_dir,x), os.path.join(temp_dir,x) , os.path.join(temp_dir,x+".mut")) for x in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir,x)) and x.endswith(".txt")]
-        print("List of detected dataset:")
+        print("\nList of detected dataset:")
         for (x,y,z) in data_files:
             print("- "+x)
+        print()
 
         print("======== Build br-index on each text (In-memory & Prefix-Free Parsing, bl=64)")
         for (input_file, idx_base, _) in data_files:
@@ -195,8 +197,8 @@ def main():
 
 
 
-    print("======== All tests finished")
     print("Total test time: {0:.4f}".format(time.time()-start0))
+    print("=-=-= br-index integration test finished =-=-=")
 
 # get mutated text with given prob
 def mutate(source,p):

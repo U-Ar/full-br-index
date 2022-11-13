@@ -7,6 +7,13 @@
 
 namespace bri {
 
+template<class T>
+void print_vec(std::vector<T> const& vec) {
+    for (auto x : vec) {
+        std::cout << (ulint) x << " ";
+    } std::cout << std::endl;
+}
+
 /*
 * constructor. 
 * \param input: string on which br-index is built

@@ -428,7 +428,8 @@ public:
         assert(in.get()==EOF);
 
         // huffman-encoding BWT run heads
-        run_heads_s.push_back(last_c);
+        run_heads_s.push_back(last_c); 
+        r++;
         assert(run_heads_s.size()==r);
         run_heads = string_t(run_heads_s);
         assert(run_heads.size()==r);
