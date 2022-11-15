@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-PROJECT(full-br-index C CXX)
+PROJECT(full-br-index CXX C)
 
 SET(SDSL_INCLUDE "~/sdsl/include") #SDSL headeres
 SET(SDSL_LIB "~/sdsl/lib") #SDSL lib
