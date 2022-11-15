@@ -17,6 +17,9 @@ in the output BWT. The dictionary and the parse should not be larger than 2GB.
 Input files larger than 2GB are ok, but computing the BWT in the traditional way
 takes 9n bytes of RAM. If this is a problem, just don't use the option -c and
 check the correctness of the BWT by some other means (for example inverting it)
+
+If you use the option -r the input file is read backwards from the end of the file.
+It is intended to use for the construction of the reversed BWT and the br-index.
 """
 
 # absolute path of auxiliary executables

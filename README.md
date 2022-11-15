@@ -14,12 +14,15 @@ The br-index is the bi-directional text index based on the r-index, supporting _
 The full br-index in this repository is the enhanced version of the br-index with additional data structures.
 In addition to extensions and locate, it supports _left-contraction_ and _right-contraction_, which are the inverse operations of _left-extension_ and _right-extension_. There are time-space trade-offs based on the value of the parameter *bl*. The recommended value is around 15, and it is set to 8 by default. The supports of the five key operations enable complex searches. As an example we implement the _Maximal Exact Matches_ query in _src/bri-mem.cpp_.
 
+The index is constructed by the _Prefix-Free Parsing_ method. Suitable for highly repetitive huge text collections.
+The rather simple in-memory construction is also supported (-i option for _bri-build_), but it takes time and consumes memory.
+
 ## System Requirements
 
 - This project is based on [sdsl-lite](https://github.com/simongog/sdsl-lite) library.
 Install sdsl-lite beforehand and modify variables SDSL_INCLUDE and SDSL_LIB in _CMakeLists.txt_.
 
-- This project has been tested under gcc 7.5.0 and gcc 12.1.0.
+- This project has been tested under gcc 7.5.0, gcc 8.4.0 and gcc 12.1.0.
 
 ## How to Use
 
@@ -34,28 +37,32 @@ cd build
 cmake ..
 make
 ```
-4 executables will be created in the _build_ directory.
+You can also run unit tests and integration tests. 
+```
+make unit-tests
+make integration-tests
+```
+For the detail of the tests, refer to _test/README.md_.
+
+By default 5 entry-point executables will be created in the _build_ directory.
 <dl>
-	<dt>bri-build</dt>
-	<dd>Builds the br-index on the input text file.</dd>
-    <dt>bri-mem</dt>
+	<dt>bri-build (Python script)</dt>
+	<dd>Builds the br-index on the input text file using Prefix-Free Parsing.</dd>
+        <dt>bri-mem</dt>
 	<dd>Computes Maximal Exact Matches of the given pattern.</dd>
 	<dt>bri-space</dt>
 	<dd>Shows the statistics of the text and the breakdown of the index space usage.</dd>
-	<dt>run_tests</dt>
+	<dt>unit-test</dt>
 	<dd>runs unit tests.</dd>
+	<dt>integration-test (Python script)</dt>
+	<dd>runs integration tests.</dd>
 </dl>
-
-Also, you can run unit tests by
-```bash
-make test-bri
-```
 
 The codes used for experiments are archived in the _experiment\_archive_ directory. 
 
 ## Citations
 
-Not published.
-
 For the br-index (without contractions), cite 
 - Arakawa, Y., Navarro, G., & Sadakane, K. (2022). Bi-Directional r-Indexes. In 33rd Annual Symposium on Combinatorial Pattern Matching (CPM 2022). Schloss Dagstuhl-Leibniz-Zentrum für Informatik.
+
+The fully-functional br-index: not published.

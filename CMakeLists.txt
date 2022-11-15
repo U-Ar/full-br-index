@@ -70,20 +70,21 @@ ENDFOREACH()
 
 
 # pfpbuild.cpp
-ADD_EXECUTABLE(pfpbuild src/pfpbuild.cpp src/pfpbuilder/utils.c)
+ADD_EXECUTABLE(pfpbuild src/pfpbuild.cpp src/pfpbuilder/utils.c src/pfpbuilder/malloc_count.c)
 TARGET_LINK_LIBRARIES(pfpbuild brindex)
 TARGET_LINK_LIBRARIES(pfpbuild sdsl)
 TARGET_LINK_LIBRARIES(pfpbuild divsufsort)
 TARGET_LINK_LIBRARIES(pfpbuild divsufsort64)
+TARGET_LINK_LIBRARIES(pfpbuild dl)
 
 ADD_SUBDIRECTORY(test)
 
 ADD_CUSTOM_TARGET(unit-tests
 	COMMAND rm -rf test-tmp
 	COMMAND mkdir test-tmp # Temporary dir to put files for tests
-	COMMAND ./run_tests
+	COMMAND ./unit-test
 	COMMAND rm -rf *.sdsl
-	DEPENDS run_tests
+	DEPENDS unit-test
 	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test
 	COMMENT "Execute unit tests."
 )

@@ -58,13 +58,7 @@ public:
         fbwt.seekg(0);
 
 
-        std::cout << std::endl << "True PFP bwt ... " << std::endl;
-        for (int i = 0; i < 100; ++i) std::cout << (char)fbwt.get() << " ";
-        std::cout << std::endl << std::endl;
-        fbwt.seekg(0);
-
-
-        std::cout << "Remapping alphabet ... " << std::flush;
+        std::cout << "(1/9) Remapping alphabet ... " << std::flush;
 
         // construct alphabet remapper (null character \0 is mapped to \1)
         idx.remap = std::vector<uchar>(256,0); idx.remap[0] = 1;
@@ -96,7 +90,7 @@ public:
         assert(idx.remap[0] == 1);
         assert(idx.remap_inv[1] == 0);
 
-        std::cout << "done.\nBuilding RLBWT ... " << std::flush;
+        std::cout << "done.\n(2/9) Building RLBWT ... " << std::flush;
 
         // build RLBWT with remapper
         fbwt.seekg(0);
@@ -111,7 +105,7 @@ public:
 
         std::cout << "done.\nNumber of runs in BWT  r: " << r << std::endl;
 
-        std::cout << "Reading SA samples at run boundaries ... " << std::flush;
+        std::cout << "(3/9) Reading SA samples at run boundaries ... " << std::flush;
 
         // read .ssa
         FILE* file_ssa = open_aux_file(input.c_str(),EXTSSA,"rb");
@@ -174,31 +168,7 @@ public:
         }
         fclose(file_esa);
 
-        std::cout << "done.\nBuilding run-length compressed PLCP ... " << std::flush;
-
-        std::cout << std::endl << "FL: " << std::endl;
-        for (int i = 0; i < 100; ++i) std::cout << idx.FL(i) << " ";
-        std::cout << std::endl;
-
-        std::cout << std::endl << "LF: " << std::endl;
-        for (int i = 0; i < 100; ++i) std::cout << idx.LF(i) << " ";
-        std::cout << std::endl;
-
-        std::cout << "PFP RLBWT: " << std::endl;
-        for (int i = 0; i < 100; ++i) std::cout << idx.remap_inv[idx.bwt[i]] << " ";
-        std::cout << std::endl;
-
-        std::cout << "In-memory samples_last ... " << std::endl;
-        for (int i = 0; i < 100; ++i) std::cout << idx.samples_last[i] << " " << std::flush;
-        std::cout << std::endl;
-
-        std::cout << "PFP Phi... " << std::endl;
-        for (int i = 0; i < 200; ++i) std::cout << idx.Phi(i) << " " << std::flush;
-        std::cout << std::endl;
-        
-        std::cout << "PFP PhiI ... " << std::endl;
-        for (int i = 0; i < 200; ++i) std::cout << idx.PhiI(i) << " " << std::flush;
-        std::cout << std::endl;
+        std::cout << "done.\n(4/9) Building run-length compressed PLCP ... " << std::flush;
 
         // construct run-length encoded PLCP
         {
@@ -208,19 +178,17 @@ public:
             ulint p, p0, pos, l, gap;
             ulint prev_pos = 0;
             ulint prev_l = 0;
-            //ulint acc0 = 0, acc1 = 1;
-            //ones.push_back(0);
             ulint acc0=0, acc1=0;
 
-            std::cout << "i-th run end PLCP: " << std::endl;
-
             for (ulint i = 0; i < r; ++i) {
-                // runの境界ごとに辞書順を求めて、
-                // そっからF_atの値を求めて、一致する間FLして、
-                // そこのPLCP値をもとめて+gap - prev_plcpだけacc0をプラスする
+                // We encode PLCP by run-length manner
+                // For each bit of the idx.first (= run start bwt char),
+                // - get its PLCP value (by repeating FL(p) and bwt[p])
+                // - add gap between the bit and the preceding bit in idx.first to the PLCP value
+                // - difference between the value and the previous PLCP can be encoded
+                // Note that if idx.first[j]=0, PLCP[j+1]=PLCP[j]-1 holds.
                 pos = idx.first.select(i);
 
-                // l = i == 0 ? pos : (pos - prev_pos - 1); // ?
                 gap = i == 0 ? pos : (pos - prev_pos - 1);
 
                 l = 0;
@@ -240,11 +208,6 @@ public:
                         p0 = idx.bwt.select(i0,c0);
                         c0 = idx.F_at(p0);
                     }
-                }
-
-                // if (i < 100) std::cout << l << " " << std::flush;
-                if (i < 100) for (ulint g = 0; g <= gap; ++g) {
-                    std::cout << l + gap - g << " " << std::flush;
                 }
 
                 if (i == 0) {
@@ -271,18 +234,9 @@ public:
             ones.push_back(acc1);
 
             idx.plcp = permuted_lcp<>(size,ones,zeros);
-            std::cout << "PLCP OK!" << std::endl;
         }
 
-        std::cout << "PFP PLCP: " << std::endl;
-        for (ulint i = 0; i < 100; ++i) std::cout << idx.plcp[i] << " ";
-        std::cout << std::endl;
-
-        std::cout << "done.\nBuilding kmer[0,bl) ... " << std::flush;
-
-        // 各runの境界につき、その前後を探索する形？
-        // run_range(run_num)でrunの範囲が分かる。そんでそこからSAの値もわかるので、
-        // そこ起点で広げたらいけるのでは？という気がしている
+        std::cout << "done.\n(5/9) Building kmer[0,bl) ... " << std::flush;
         
         // consruct kmer[0,bl) (contraction shortcut bitvector)
         {
@@ -356,7 +310,7 @@ public:
             throw new std::runtime_error("Cannot open file " + input_rev + ".bwt");
         }
 
-        std::cout << "Building RLBWT^R ... " << std::flush;
+        std::cout << "(6/9) Building RLBWT^R ... " << std::flush;
 
         // build RLBWT^R with remapper
         fbwt_rev.seekg(0);
@@ -370,7 +324,7 @@ public:
 
         std::cout << "done.\nNumber of runs in BWT^R  rR: " << rR << std::endl;
 
-        std::cout << "Reading SA^R samples at run boundaries ... " << std::flush;
+        std::cout << "(7/9) Reading SA^R samples at run boundaries ... " << std::flush;
 
         // read .rev.ssa
         FILE* file_ssa_rev = open_aux_file(input_rev.c_str(),EXTSSA,"rb");
@@ -432,7 +386,7 @@ public:
         }
         fclose(file_esa_rev);
 
-        std::cout << "done.\nBuilding run-length compressed PLCP^R ... " << std::flush;
+        std::cout << "done.\n(8/9) Building run-length compressed PLCP^R ... " << std::flush;
 
         // construct run-length encoded PLCP^R
         {
@@ -458,7 +412,7 @@ public:
                     p0 = p - 1;
                     c0 = idx.F_at(p0);
                     while (c == c0) {
-                        // compute FL(p) & FL(p0), compare BWT chars
+                        // compute FLR(p) & FLR(p0), compare BWT chars
                         l++;
                         ulint i = p - idx.F[c];
                         p = idx.bwtR.select(i,c);
@@ -495,7 +449,7 @@ public:
             idx.plcpR = permuted_lcp<>(size,ones,zeros);
         }
 
-        std::cout << "done.\nBuilding kmer^R[0,bl) ... " << std::flush;
+        std::cout << "done.\n(9/9) Building kmer^R[0,bl) ... " << std::flush;
 
 
         // consruct kmerR[0,bl) (contraction shortcut bitvector)
@@ -564,10 +518,10 @@ public:
     }
 
     ulint save_to_file(std::string const& output) {
-        std::cout << "Saving br-index to " << output + "." + EXTIDX << " ... " << std::flush;
+        std::cout << "Saving PFP built br-index to " << output + "." + EXTIDX << " ... " << std::flush;
         std::ofstream f(output + "." + EXTIDX);
         ulint bytes = idx.serialize(f);
-        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
+        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl << std::endl;
         return bytes;
     }
 };
@@ -581,9 +535,9 @@ void print_help(char** argv, Args &args) {
     std::cout << " unless you use -i option (in-memory construction, slow&memory consuming)." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl
-        << "\t-i  \tin-memory construction using constructor of br_index" << std::endl
+        << "\t-i  \tin-memory construction using constructor of br_index class" << std::endl
         << "\t-l L\tparameter bl for contraction shortcut, def. " << args.bl << std::endl
-        << "\t-o O\tspecified output file basename, def. <input filename> " << std::endl;
+        << "\t-o O\tspecified output index file basename, def. <input filename> " << std::endl;
     exit(1);
 }
 
@@ -650,10 +604,10 @@ int main(int argc, char** argv) {
 
         br_index idx(input,arg.bl,false);
 
-        std::cout << "Saving br-index to " << arg.output_base + EXTIDX << " ... " << std::flush;
+        std::cout << "Saving in-memory built br-index to " << arg.output_base + "." + EXTIDX << " ... " << std::flush;
         std::ofstream f(arg.output_base + "." + EXTIDX);
         ulint bytes = idx.serialize(f);
-        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
+        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl << std::endl;
 
         return 0;
     }

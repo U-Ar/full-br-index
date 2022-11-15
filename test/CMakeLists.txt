@@ -1,5 +1,5 @@
 # ---- unit tests ----
-ADD_EXECUTABLE(run_tests
+ADD_EXECUTABLE(unit-test
 	run_tests.cpp 
 	br_index_test.cpp
 	sparse_sd_vector_test.cpp 
@@ -7,9 +7,9 @@ ADD_EXECUTABLE(run_tests
 	rle_string_test.cpp
 	permuted_lcp_test.cpp
 )
-TARGET_LINK_LIBRARIES(run_tests PRIVATE brindex sdsl divsufsort divsufsort64)
+TARGET_LINK_LIBRARIES(unit-test PRIVATE brindex sdsl divsufsort divsufsort64)
 
-TARGET_INCLUDE_DIRECTORIES(run_tests PRIVATE ${PROJECT_SOURCE_DIR}/external/iutest/include)
+TARGET_INCLUDE_DIRECTORIES(unit-test PRIVATE ${PROJECT_SOURCE_DIR}/external/iutest/include)
 
 
 # ---- integration tests ----
