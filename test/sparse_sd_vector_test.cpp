@@ -2,7 +2,9 @@
 
 #include <vector>
 #include <fstream>
-#include "../src/sparse_sd_vector.hpp"
+#include "sparse_sd_vector.hpp"
+
+using namespace bri;
 
 IUTEST(SparseSdVectorTest, AllZeroBasic) {
     std::vector<bool> vec(10000,0);

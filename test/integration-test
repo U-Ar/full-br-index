@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+
+import sys, time, argparse, subprocess, os, random
+
+"""
+br-index integration test script.
+
+<Pre-test>
+Both of in-memory construction and PFP construction are conducted on each text with bl=64. 
+They are loaded with parameter bl=0 and bl=64.
+
+In total, 4 different indexes are tested for each text:
+- In-memory build, bl=0
+- In-memory build, bl=64
+- PFP build, bl=0
+- PFP build, bl=64
+
+
+<Test1> (call the subprocess itest1.cpp)
+
+We divide the target text into substrings of the length=LENGTH.
+For each substring, we
+
+- sequentially apply left-extension from an empty string to the entire substring. After that, we
+    - sequentially apply left-contraction from the entire substring to an empty string, and
+    - sequentially apply right-contraction from the entire substring to an empty string. Also we
+- sequentially apply right-extension from an empty string to the entire substring. 
+
+For each step of extension/contraction, we
+- compare the returned value of count with Karp-Rabin hashtable, and
+- confirm the returned list of locate correctly points to the starting positions of the currently searched pattern.
+
+
+<Test2> (call the subprocess itest2.cpp)
+
+We mutate characters of the target text with the given probability (0.05 by default). We let this mutated text be the pattern text.
+We compute Maximal Exact Matches on the pattern and the target.
+"""
+
+# absolute path of related directories
+dirname = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(dirname,"dataset")
+build_dir = os.path.abspath(os.path.join(dirname, os.pardir))
+temp_dir = os.path.join(dirname,"test-tmp")
+
+build_exe = os.path.join(build_dir, "bri-build")
+test1_exe = os.path.join(dirname,"itest1")
+test2_exe = os.path.join(dirname,"itest2")
+
+EXTIDX = ".bri"
+EXTIN = ".in"
+EXTPFP = ".pfp"
+
+# probability of character mutation for Test2
+MUT_PROB = 0.05
+
+def main():
+    print("=-=-= br-index integration test. =-=-=")
+    print()
+    print("Datasets are read from {}".format(data_dir))
+    print("Index files and temporary files will be put to {}".format(temp_dir))
+
+    start0 = start = time.time()
+    command = ""
+
+    ok = True
+
+    logfile_name = os.path.join(dirname, "i-test.log")
+    print("Sending logging messages to file: i-test.log")
+
+    with open(logfile_name,"w") as logfile:
+
+        data_files = [(os.path.join(data_dir,x), os.path.join(temp_dir,x) , os.path.join(temp_dir,x+".mut")) for x in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir,x)) and x.endswith(".txt")]
+        print("\nList of detected dataset:")
+        for (x,y,z) in data_files:
+            print("- "+x)
+        print()
+
+        print("======== Build br-index on each text (In-memory & Prefix-Free Parsing, bl=64)")
+        for (input_file, idx_base, _) in data_files:
+            print("==== Build on " + input_file)
+
+            command = "{exe} {file} -o {output} -l 64 -i".format(exe=build_exe,
+                file=input_file, output=idx_base+EXTIN)
+            print("==== In-memory build. Command: ", command)
+            if(execute_command(command,logfile,logfile_name)!=True):
+                ok = False
+
+            command = "{exe} {file} -o {output} -l 64".format(exe=build_exe,
+                file=input_file, output=idx_base+EXTPFP)
+            print("==== PFP build. Command: ", command)
+            if(execute_command(command,logfile,logfile_name)!=True):
+                ok = False
+        print("======== All build complete")
+        print("Elapsed time: {0:.4f}".format(time.time()-start))
+        print()
+            
+
+
+        print("======== Test1: l-ext, r-ext, l-cont, l-cont, locate")
+        for (input_file, idx_base, _) in data_files:
+
+            start = time.time()
+            print("==== Testing on " + input_file)
+
+            command = "{exe} {file} {idx} 0".format(exe=test1_exe,
+                file=input_file, idx=idx_base+EXTIN+EXTIDX)
+            print("==== In-memory, bl=0. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            command = "{exe} {file} {idx} 64".format(exe=test1_exe,
+                file=input_file, idx=idx_base+EXTIN+EXTIDX)
+            print("==== In-memory, bl=64. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+            
+            command = "{exe} {file} {idx} 0".format(exe=test1_exe,
+                file=input_file, idx=idx_base+EXTPFP+EXTIDX)
+            print("==== PFP, bl=0. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+            
+            command = "{exe} {file} {idx} 64".format(exe=test1_exe,
+                file=input_file, idx=idx_base+EXTPFP+EXTIDX)
+            print("==== PFP, bl=64. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            print("==== Test1 on {} finished".format(input_file))
+            print("Elapsed time: {0:.4f}".format(time.time()-start))
+            print()
+
+        print("======== Test1 finished")
+        print()
+
+        p = MUT_PROB
+        print("Making pattern texts by mutating characters with prob.",p)
+        for (in_file, _, out_file) in data_files:
+            text = ""
+            with open(in_file,mode="r",encoding='ISO-8859-1') as fin:
+                text = fin.read()
+            with open(out_file,mode="w",encoding='ISO-8859-1') as fout:
+                fout.write(mutate(text,p))
+                print("Mutated {} is saved to {}".format(in_file,out_file))
+
+        print()
+        print("======== Test2: computing Maximal Exact Matches")
+        for (input_file, idx_base, pattern_file) in data_files:
+
+            start = time.time()
+            print("==== Testing on pattern {} & text {}".format(pattern_file,input_file))
+
+            command = "{exe} {file} {idx} {patt} 0".format(exe=test2_exe,
+                file=input_file, idx=idx_base+EXTIN+EXTIDX, patt=pattern_file)
+            print("==== In-memory, bl=0. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            command = "{exe} {file} {idx} {patt} 64".format(exe=test2_exe,
+                file=input_file, idx=idx_base+EXTIN+EXTIDX, patt=pattern_file)
+            print("==== In-memory, bl=64. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            command = "{exe} {file} {idx} {patt} 0".format(exe=test2_exe,
+                file=input_file, idx=idx_base+EXTPFP+EXTIDX, patt=pattern_file)
+            print("==== PFP, bl=0. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            command = "{exe} {file} {idx} {patt} 64".format(exe=test2_exe,
+                file=input_file, idx=idx_base+EXTPFP+EXTIDX, patt=pattern_file)
+            print("==== PFP, bl=64. Command: ",command)
+            if(execute_test(command,logfile,logfile_name)!=True):
+                ok = False
+
+            print("==== Test2 on {} finished".format(input_file))
+            print("Elapsed time: {0:.4f}".format(time.time()-start))
+            print()
+
+
+        print("======== Test2 finished")
+
+    print("Total test time: {0:.4f}".format(time.time()-start0))
+    print("=-=-= br-index integration test finished =-=-=")
+    if ok:
+        print("Passed all tests. ",end="")
+    else:
+        print("Some tests failed. ",end="")
+    print("Test log saved to "+logfile_name+".")
+
+# get mutated text with given prob
+def mutate(source,p):
+    alpha = set()
+    for c in source:
+        if "\0" == c or "\1" == c or "\2" == c:
+            print("Error: contains reserved delimiter symbol.")
+            sys.exit(1)
+        alpha.add(c)
+    alphabet = list(alpha)
+
+    res = ""
+    sigma = len(alphabet)
+    for c in source:
+        if random.random() < p:
+            ri = random.randint(0,sigma-1)
+            while alphabet[ri] == c:
+                ri = random.randint(0,sigma-1)
+            res += alphabet[ri]
+        else:
+            res += c
+    return res
+
+# execute command: return True is everything OK, False otherwise
+def execute_command(command,logfile,logfile_name,env=None):
+    try:
+        #subprocess.run(command.split(),stdout=logfile,stderr=logfile,check=True,env=env)
+        subprocess.check_call(command.split(),stdout=logfile,stderr=logfile,env=env)
+    except subprocess.CalledProcessError:
+        print("Error executing command line:")
+        print("\t"+ command)
+        print("Check log file: " + logfile_name)
+        return False
+    return True
+
+# execute test: return True if the test passes, False otherwise
+def execute_test(command,logfile,logfile_name,env=None):
+    try:
+        #subprocess.run(command.split(),stdout=logfile,stderr=logfile,check=True,env=env)
+        subprocess.check_call(command.split(),stdout=logfile,stderr=logfile,env=env)
+    except subprocess.CalledProcessError:
+        print("Test failed. command:")
+        print("\t"+ command)
+        print("Check log file: " + logfile_name)
+        return False
+    return True
+
+if __name__ == "__main__":
+    main()

@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <fstream>
-#include "../src/huffman_string.hpp"
+#include "huffman_string.hpp"
 
 using namespace bri;
 
