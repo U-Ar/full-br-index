@@ -60,6 +60,7 @@ def main():
                 sys.exit(1)
             print("==== Build complete")
             print("Elapsed time: {0:.4f}".format(time.time()-start))
+            print()
             return
 
         # ---- compute .bwt, .ssa, .esa with PFP
@@ -67,7 +68,7 @@ def main():
             wsize=args.wsize, modulus=args.mod, th=args.t, file=args.input)
         if args.v: command += " -v"
 
-        print("======== Computing PFP forwards. Command: ", command)
+        print("==== Computing PFP forwards. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
             sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
@@ -80,7 +81,7 @@ def main():
             wsize=args.wsize, modulus=args.mod, th=args.t, file=args.input)
         if args.v: command += " -v"
 
-        print("======== Computing PFP backwards. Command: ", command)
+        print("==== Computing PFP backwards. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
             sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
@@ -95,7 +96,7 @@ def main():
             command += " -o {}".format(args.output)
         if args.v: command += " -v"
 
-        print("======== Building br-index from PFP. Command: ", command)
+        print("==== Building br-index from PFP. Command: ", command)
         if(execute_command(command,logfile,logfile_name)!=True):
             sys.exit(1)
         print("Elapsed time: {0:.4f}".format(time.time()-start))
@@ -113,8 +114,9 @@ def main():
         # ---- delete intermediate files
         delete_temp_files(args,logfile,logfile_name)
 
-        print("======== Build complete")
+        print("==== Build complete")
         print("Total construction time: {0:.4f}".format(total_time))
+        print()
 
 
 

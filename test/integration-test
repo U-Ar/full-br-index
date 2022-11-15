@@ -2,55 +2,39 @@
 
 import sys, time, argparse, subprocess, os, random
 
-Description = """
+"""
 br-index integration test script.
 
+<Pre-test>
+Both of in-memory construction and PFP construction are conducted on each text with bl=64. 
+They are loaded with parameter bl=0 and bl=64.
 
-やること
-
-- datasetディレクトリの全ファイルについてイテレーションする
-以下は一つのテキストについて
-
-- パターンに確率1/20ぐらいで変異を起こしたファイルを作ってtest-tmpに格納する
-- test-tmpにin-memoryなビルドとPFPなビルドを行った(bl=64で)インデックスファイルを格納
-- それぞれをbl=0、bl=64の2パターンでロードする
-
-→ビルドは2パターンだが、その後のテストは合計4パターン
-
-ただ、各インデックスファイルに対するテストは同じ内容になるので、ここからをC++実行ファイルで作成する
+In total, 4 different indexes are tested for each text:
+- In-memory build, bl=0
+- In-memory build, bl=64
+- PFP build, bl=0
+- PFP build, bl=64
 
 
-テスト内容：
+<Test1> (call the subprocess itest1.cpp)
 
-- left-extension
-- right-extension
-- left-contraction
-- right-contraction
-窓を左から右へスライド、スライド長さはしんどさ考えると10000prefixか
-これを長さ2, 3, 4, 5, 10, 20, ..., 100 までやる
-事前にKRhashを登録しておいて数が分かるように
-=> right-extensionのみとleft-extensionのみで行うものと、
-=> left-contractionとright-extensionのテスト
-bl=0のやつについてはbl=10から
+We divide the target text into substrings of the length=LENGTH.
+For each substring, we
 
-50までのKRhashをすべて登録しておく
+- sequentially apply left-extension from an empty string to the entire substring. After that, we
+    - sequentially apply left-contraction from the entire substring to an empty string, and
+    - sequentially apply right-contraction from the entire substring to an empty string. Also we
+- sequentially apply right-extension from an empty string to the entire substring. 
 
-100000を長さ50のパターンで分割してブロック分けする(最後が端数になったらそれは除外)
-それぞれのブロックについて、
-- left-extensionのみで長さ50まで, KRhashでカウントの一致確認、長さ10以上のときはlocateの妥当性も追加で
-    - 妥当でないならアウト
-    - そこからleft-contractionのみで最後まで、その全過程でlocateの妥当性
-    - right-contractionのみで最後まで、その全過程でlocateの妥当性
-- right-extensionのみで長さ50まで、その全過程でlocateの妥当性
-
-最初のブロックのみ長さ10以下のパターンでのlocateの妥当性も全確認する
-
-- MEMs
-左からと右から、それぞれMEMsを行う
-確かにMaximalになっていることも確認したいし、全locateが正しいことも確認したい
+For each step of extension/contraction, we
+- compare the returned value of count with Karp-Rabin hashtable, and
+- confirm the returned list of locate correctly points to the starting positions of the currently searched pattern.
 
 
+<Test2> (call the subprocess itest2.cpp)
 
+We mutate characters of the target text with the given probability (0.05 by default). We let this mutated text be the pattern text.
+We compute Maximal Exact Matches on the pattern and the target.
 """
 
 # absolute path of related directories
