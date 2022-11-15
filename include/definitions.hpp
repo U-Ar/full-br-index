@@ -75,6 +75,12 @@ struct br_sample {
         return (range.first > range.second) || (rangeR.first > rangeR.second);
     }
 
+    // the pattern exists
+    inline bool is_valid() const 
+    {
+        return (range.first <= range.second) && (rangeR.first <= rangeR.second);
+    }
+
     inline bool is_leaf() const
     {
         return size() == 1;
@@ -88,7 +94,7 @@ struct br_sample {
     // range size
     inline ulint size() const
     {
-        return range.second + 1 - range.first;
+        return is_valid() ? (range.second + 1 - range.first) : 0;
     }
     
 };

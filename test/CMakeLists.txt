@@ -16,7 +16,7 @@ TARGET_INCLUDE_DIRECTORIES(run_tests PRIVATE ${PROJECT_SOURCE_DIR}/external/iute
 
 ADD_EXECUTABLE(itest1 itest1.cpp)
 TARGET_LINK_LIBRARIES(itest1 PRIVATE brindex sdsl divsufsort divsufsort64)
-ADD_EXECUTABLE(itest2 itest1.cpp)
+ADD_EXECUTABLE(itest2 itest2.cpp)
 TARGET_LINK_LIBRARIES(itest2 PRIVATE brindex sdsl divsufsort divsufsort64)
 
 # copy dataset & testing Python script to build/test/dataset

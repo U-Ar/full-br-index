@@ -102,6 +102,12 @@ br_index::br_index(std::string const& input, ulint length, bool sais) {
 
     plcp = permuted_lcp<>(cc);
 
+
+    std::cout << "In-memory PLCP: " << std::endl;
+    for (ulint i = 0; i < 100; ++i) std::cout << plcp[i] << " ";
+    std::cout << std::endl;
+
+
     // remove cache of text and SA
     sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
     sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
@@ -174,15 +180,19 @@ br_index::br_index(std::string const& input, ulint length, bool sais) {
     for(ulint i = 1; i < 256; ++i) 
         F[i] += F[i-1];
 
+    std::cout << "True in-memory bwt ... " << std::endl;
+    for (int i = 0; i < 100; ++i) std::cout << remap_inv[bwt_s[i]] << " ";
+        std::cout << std::endl;
 
-    // remember BWT position of terminator
-    // for(ulint i = 0; i < bwt_s.size(); ++i)
-    //     if(bwt_s[i]==TERMINATOR)
-    //         terminator_position = i;
-    
-    // for(ulint i = 0; i < bwt_sR.size(); ++i)
-    //     if(bwt_sR[i]==TERMINATOR)
-    //         terminator_positionR = i;
+    std::cout << "In-memory FL ... " << std::endl;
+
+    for (int i = 0; i < 100; ++i) std::cout << FL(i) << " ";
+        std::cout << std::endl;
+
+    std::cout << "In-memory LF ... " << std::endl;
+
+    for (int i = 0; i < 100; ++i) std::cout << LF(i) << " ";
+        std::cout << std::endl;    
 
     assert(input.size() + 1 == bwt.size());
 
@@ -278,6 +288,21 @@ br_index::br_index(std::string const& input, ulint length, bool sais) {
     {
         last_to_run[i] = samples_last_vec[i].second;
     }
+
+    std::cout << "In-memory Phi ... " << std::endl;
+
+    for (int i = 0; i < 200; ++i) std::cout << Phi(i) << " " << std::flush;
+    std::cout << std::endl;
+    
+    std::cout << "In-memory PhiI ... " << std::endl;
+
+    for (int i = 0; i < 200; ++i) std::cout << PhiI(i) << " " << std::flush;
+    std::cout << std::endl;
+
+    std::cout << "In-memory samples_last ... " << std::endl;
+
+    for (int i = 0; i < 100; ++i) std::cout << samples_last[i] << " " << std::flush;
+    std::cout << std::endl;
 
 
 

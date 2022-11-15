@@ -14,13 +14,14 @@ const ulint LENGTH = 50;
 
 struct KR_window {
     int wsize;
-    int *window;
+    //int *window;
+    vector<int> window;
     int asize;
     // const ulint prime = 1999999973;
     const ulint prime = 27162335252586509;
     ulint hash;
     ulint tot_char;
-    ulint asize_pot;   // asize^(wsize-1) mod prime 
+    ulint asize_pot;   // asize^(wsize-1) mod prime
     
     KR_window(int w): wsize(w) {
         asize = 256;
@@ -28,7 +29,8 @@ struct KR_window {
         for(int i=1;i<wsize;i++) 
         asize_pot = (asize_pot*asize)% prime; // ugly linear-time power algorithm  
         // alloc and clear window
-        window = new int[wsize];
+        // window = new int[wsize];
+        window = vector<int>(w);
         reset();     
     }
 
@@ -38,8 +40,9 @@ struct KR_window {
         asize_pot = 1;
         for(int i=1;i<wsize;i++) 
         asize_pot = (asize_pot*asize)% prime;
-        delete[] window;
-        window = new int[wsize];
+        // delete[] window;
+        // window = new int[wsize];
+        window.resize(w);
         reset();
     }
     
@@ -67,10 +70,6 @@ struct KR_window {
         w.append(1,window[i%wsize]);
         return w;
     }
-    
-    ~KR_window() {
-        delete[] window;
-    } 
 
 };
 
@@ -79,9 +78,9 @@ ulint kr_hash(string const& s) {
     //const ulint prime = 3355443229;     // next prime(2**31+2**30+2**27)
     const ulint prime = 27162335252586509; // next prime (2**54 + 2**53 + 2**47 + 2**13)
     for(size_t k = 0; k < s.size(); k++) {
-      int c = (unsigned char) s[k];
-      assert(c>=0 && c< 256);
-      hash = (256*hash + c) % prime;    //  add char k
+        int c = (unsigned char) s[k];
+        assert(c>=0 && c< 256);
+        hash = (256*hash + c) % prime;    //  add char k
     } 
     return hash; 
 }
@@ -90,7 +89,7 @@ ulint kr_hash(string const& s) {
 // keys are Karp-Rabin hash
 map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
 {
-    vector<KR_window> windows(max_len,KR_window(1));
+    vector<KR_window> windows(max_len, KR_window(1));
     for (ulint l = 1; l <= max_len; ++l) windows[l-1].resize(l);
 
     map<ulint,ulint> hash_table;
@@ -99,10 +98,10 @@ map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
     {
         for (ulint l = 1; l <= max_len; ++l) 
         {
-            ulint hash = windows[l-1].addchar(text[i]); 
+            ulint hash = windows[l-1].addchar((uchar)text[i]); 
             if (i >= l-1) {
                 // increment hash table's freq
-                if (hash_table.find(hash)==hash_table.end()) {
+                if (hash_table.count(hash) == 0) {
                     hash_table[hash] = 1;
                 } else {
                     hash_table[hash]++;
@@ -121,15 +120,16 @@ bool verify(string const& text, br_index& idx, br_sample const& sample,
     bool ok = true;
     string opname = rightward ? "rightward MEMs" : "leftward MEMs";
 
+    ulint cnt = idx.count_sample(sample);
+
     if (l <= LENGTH) {
         ulint hash = kr_hash(pattern.substr(i,l));
-        ulint cnt = idx.count_sample(sample);
 
         // check frequency of substring
         if (freqs.find(hash)==freqs.end() || freqs.at(hash)!=cnt)
         {
             cerr << "Error at " << opname << ", position " << i << ", length " << l << "." << endl;
-            cerr << "  Numbers of substring " << pattern.substr(i,l) << " differ." << endl;
+            cerr << "  Numbers of substring \"" << pattern.substr(i,l) << "\" differ." << endl;
             cerr << "  KR hash  : " << (freqs.find(hash)==freqs.end() ? 0 : freqs.at(hash)) << endl;
             cerr << "  br-index : " << cnt;
             return false;
@@ -138,8 +138,8 @@ bool verify(string const& text, br_index& idx, br_sample const& sample,
 
     // check non-existence of left-extension
     if (i > 0) {
-        br_sample ex_sample(idx.left_extension(sample,pattern[i-1]));
-        if (ex_sample.size() > 0) {
+        br_sample ex_sample(idx.left_extension(sample,(uchar)pattern[i-1]));
+        if (ex_sample.is_valid()) {
             cerr << "Error at " << opname << ", position " << i << ", length " << l << "." << endl;
             cerr << "  current pattern: " << pattern.substr(i,l) << endl;
             cerr << "    is not maximal." << endl;
@@ -151,8 +151,8 @@ bool verify(string const& text, br_index& idx, br_sample const& sample,
 
     // check non-existence of right-extension
     if (i+l < pattern.size()) {
-        br_sample ex_sample(idx.right_extension(sample,pattern[i+l]));
-        if (ex_sample.size() > 0) {
+        br_sample ex_sample(idx.right_extension(sample,(uchar)pattern[i+l]));
+        if (ex_sample.is_valid()) {
             cerr << "Error at " << opname << ", position " << i << ", length " << l << "." << endl;
             cerr << "  current pattern: " << pattern.substr(i,l) << endl;
             cerr << "    is not maximal." << endl;
@@ -181,7 +181,7 @@ bool verify(string const& text, br_index& idx, br_sample const& sample,
 
         // check the match between the pattern and located substrings
         string reference = text.substr(pos,l);
-        if (pattern != reference) {
+        if (pattern.substr(i,l) != reference) {
             cerr << "Error at " << opname << ", position " << i << ", length " << l << "." << endl;
             cerr << "  Substring starting from located pos differ from the pattern." << endl;
             cerr << "  Pos : " << pos << endl;
@@ -200,7 +200,7 @@ int main(int argc, char** argv)
 
     auto t1 = clock::now();
 
-    if (argc != 5) { cout << "Invalid command line argument. Exitting ... " << endl; exit(1); }
+    if (argc != 5) { cerr << "Invalid command line argument. Exitting ... " << endl; exit(1); }
 
     const string EXTIDX = ".bri";
     const string EXTIN = ".in";
@@ -208,8 +208,8 @@ int main(int argc, char** argv)
 
     string input_file = argv[1];
     string idx_file = argv[2];
-    long bl = stoi(argv[3]);
-    string patt_file = argv[4];
+    string patt_file = argv[3];
+    long bl = stoi(argv[4]);
 
     cout << "==== Test2 on " << input_file;
     if (idx_file.find(EXTIN+EXTIDX) != string::npos) cout << " with in-memory construction, ";
@@ -221,8 +221,8 @@ int main(int argc, char** argv)
     if (!fin.is_open()) {
         cerr << "Text file " << input_file << " is not found. Exitting ... " << endl; exit(1);
     }
-    string text;
-    while (!fin.eof()) text.push_back(fin.get());
+
+    string text((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
     fin.close();
 
 
@@ -267,6 +267,8 @@ int main(int argc, char** argv)
     ulint n = text.size();
     ulint m = pattern.size();
 
+    bool all_ok = true;
+
     // compute MEMs from left to right
     {
         ulint j = 0, l = 0;
@@ -277,7 +279,7 @@ int main(int argc, char** argv)
         for (ulint i = 0; i < m; ++i) {
             while (j < m)
             {
-                br_sample new_sample = right_extension(sample, (uchar)pattern[j]);
+                br_sample new_sample = idx.right_extension(sample, (uchar)pattern[j]);
                 if (new_sample.is_invalid()) break;
                 extended = true;
                 sample = new_sample;
@@ -292,17 +294,18 @@ int main(int argc, char** argv)
             
             if (i == j)
             {
-                sample = get_initial_sample();
+                sample = idx.get_initial_sample();
                 j++;
                 l = 0;
             }
             else 
             {
-                sample = left_contraction(sample);
+                sample = idx.left_contraction(sample);
                 l--;
             }
             extended = false;
         }
+        all_ok = ok && all_ok;
     }
 
     // compute MEMs from right to left
@@ -316,7 +319,7 @@ int main(int argc, char** argv)
         for (ulint i = m; i-- > 0;) {
             while (j >= 0)
             {
-                br_sample new_sample = left_extension(sample, (uchar)pattern[j]);
+                br_sample new_sample = idx.left_extension(sample, (uchar)pattern[j]);
                 if (new_sample.is_invalid()) break;
                 extended = true;
                 sample = new_sample;
@@ -331,24 +334,27 @@ int main(int argc, char** argv)
             
             if (i == (ulint)j)
             {
-                sample = get_initial_sample();
+                sample = idx.get_initial_sample();
                 j--;
                 l = 0;
             }
             else 
             {
-                sample = right_contraction(sample);
+                sample = idx.right_contraction(sample);
                 l--;
             }
             extended = false;
         }
+        all_ok = ok && all_ok;
     }
 
     auto t2 = clock::now();
 
     cout << "==== Test2 on " << input_file << " finished" << endl;
-    cout << "     Elapsed time: " 
+    cout << "==== (Elapsed time: " 
          << fixed << setprecision(4) 
          << (double)chrono::duration_cast<chrono::milliseconds>(t2-t1).count()/1000
-         << endl;
+         << ")" << endl << endl;
+
+    if (!all_ok) exit(1);
 }

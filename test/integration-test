@@ -82,7 +82,7 @@ def main():
     logfile_name = os.path.join(dirname, "i-test.log")
     print("Sending logging messages to file: i-test.log")
 
-    with open(logfile_name,"a") as logfile:
+    with open(logfile_name,"w") as logfile:
 
         data_files = [(os.path.join(data_dir,x), os.path.join(temp_dir,x) , os.path.join(temp_dir,x+".mut")) for x in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir,x)) and x.endswith(".txt")]
         print("\nList of detected dataset:")
@@ -99,16 +99,15 @@ def main():
             print("==== In-memory build. Command: ", command)
             if(execute_command(command,logfile,logfile_name)!=True):
                 return
-            print("==== In-memory build complete")
 
             command = "{exe} {file} -o {output} -l 64".format(exe=build_exe,
                 file=input_file, output=idx_base+EXTPFP)
             print("==== PFP build. Command: ", command)
             if(execute_command(command,logfile,logfile_name)!=True):
                 return
-            print("==== PFP build complete")
         print("======== All build complete")
         print("Elapsed time: {0:.4f}".format(time.time()-start))
+        print()
             
 
 
@@ -126,13 +125,13 @@ def main():
 
             command = "{exe} {file} {idx} 64".format(exe=test1_exe,
                 file=input_file, idx=idx_base+EXTIN+EXTIDX)
-            print("==== PFP, bl=64. Command: ",command)
+            print("==== In-memory, bl=64. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
                 pass
             
             command = "{exe} {file} {idx} 0".format(exe=test1_exe,
                 file=input_file, idx=idx_base+EXTPFP+EXTIDX)
-            print("==== In-memory, bl=0. Command: ",command)
+            print("==== PFP, bl=0. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
                 pass
             
@@ -144,46 +143,47 @@ def main():
 
             print("==== Test1 on {} finished".format(input_file))
             print("Elapsed time: {0:.4f}".format(time.time()-start))
+            print()
 
         print("======== Test1 finished")
-        
+        print()
 
         p = MUT_PROB
         print("Making pattern texts by mutating characters with prob.",p)
         for (in_file, _, out_file) in data_files:
             text = ""
-            with open(in_file,mode="r") as fin:
+            with open(in_file,mode="r",encoding='ISO-8859-1') as fin:
                 text = fin.read()
-            with open(out_file,mode="w") as fout:
+            with open(out_file,mode="w",encoding='ISO-8859-1') as fout:
                 fout.write(mutate(text,p))
                 print("Mutated {} is saved to {}".format(in_file,out_file))
 
-
+        print()
         print("======== Test2: computing Maximal Exact Matches")
         for (input_file, idx_base, pattern_file) in data_files:
 
             start = time.time()
             print("==== Testing on pattern {} & text {}".format(pattern_file,input_file))
 
-            command = "{exe} {file} {idx} 0 {patt}".format(exe=test2_exe,
+            command = "{exe} {file} {idx} {patt} 0".format(exe=test2_exe,
                 file=input_file, idx=idx_base+EXTIN+EXTIDX, patt=pattern_file)
             print("==== In-memory, bl=0. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
                 pass
 
-            command = "{exe} {file} {idx} 64 {patt}".format(exe=test2_exe,
+            command = "{exe} {file} {idx} {patt} 64".format(exe=test2_exe,
                 file=input_file, idx=idx_base+EXTIN+EXTIDX, patt=pattern_file)
             print("==== In-memory, bl=64. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
                 pass
 
-            command = "{exe} {file} {idx} 0 {patt}".format(exe=test2_exe,
+            command = "{exe} {file} {idx} {patt} 0".format(exe=test2_exe,
                 file=input_file, idx=idx_base+EXTPFP+EXTIDX, patt=pattern_file)
             print("==== PFP, bl=0. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
                 pass
 
-            command = "{exe} {file} {idx} 64 {patt}".format(exe=test2_exe,
+            command = "{exe} {file} {idx} {patt} 64".format(exe=test2_exe,
                 file=input_file, idx=idx_base+EXTPFP+EXTIDX, patt=pattern_file)
             print("==== PFP, bl=64. Command: ",command)
             if(execute_test(command,logfile,logfile_name)!=True):
@@ -191,6 +191,7 @@ def main():
 
             print("==== Test2 on {} finished".format(input_file))
             print("Elapsed time: {0:.4f}".format(time.time()-start))
+            print()
 
 
         print("======== Test2 finished")
@@ -199,6 +200,7 @@ def main():
 
     print("Total test time: {0:.4f}".format(time.time()-start0))
     print("=-=-= br-index integration test finished =-=-=")
+    print("Test log saved to "+logfile_name+".")
 
 # get mutated text with given prob
 def mutate(source,p):

@@ -57,6 +57,13 @@ public:
         long size = fbwt.tellg();
         fbwt.seekg(0);
 
+
+        std::cout << std::endl << "True PFP bwt ... " << std::endl;
+        for (int i = 0; i < 100; ++i) std::cout << (char)fbwt.get() << " ";
+        std::cout << std::endl << std::endl;
+        fbwt.seekg(0);
+
+
         std::cout << "Remapping alphabet ... " << std::flush;
 
         // construct alphabet remapper (null character \0 is mapped to \1)
@@ -81,7 +88,7 @@ public:
                 }
             }
             // build F column
-            for (ulint i = 0; i < 256; ++i) idx.F[i] = freqs[idx.remap_inv[i]];
+            for (ulint i = 1; i <= idx.sigma; ++i) idx.F[i] = freqs[idx.remap_inv[i]];
             for (ulint i = 255; i > 0; --i) idx.F[i] = idx.F[i-1];
             idx.F[0] = 0;
             for (ulint i = 1; i < 256; ++i) idx.F[i] += idx.F[i-1];
@@ -113,19 +120,12 @@ public:
         idx.first_to_run = sdsl::int_vector<>(r,0,log_r);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(r);
-            /*ulint* sa_val;
+            ulint* buf = new ulint[1];
             for (ulint i = 0; i < r; ++i) {
-                fread(sa_val,SABYTES,1,file_ssa);
-                size_t s = fread(sa_val,SABYTES,1,file_ssa);
-                if (s!=1) die(".ssa read failed");
-                idx.samples_first[i] = *sa_val > 0 ? *sa_val-1 : size-1;
-                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
-            }*/
-            ulint* buf = new ulint[2];
-            for (ulint i = 0; i < r; ++i) {
-                size_t s = fread(buf, SABYTES, 2, file_ssa);
-                if (s!=2) die(".ssa read failed.");
-                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                if (fread(buf, SABYTES, 1, file_ssa) != 1) die(".ssa read failed.");
+                if (fread(buf, SABYTES, 1, file_ssa) != 1) die(".ssa read failed.");
+                ulint sa_val = buf[0] % (1UL << (8*SABYTES));
+                sa_val = (sa_val > 0) ? (sa_val - 1) : (size-1);
                 idx.samples_first[i] = sa_val;
                 pos_run_pairs[i] = {sa_val,i};
             }
@@ -149,24 +149,17 @@ public:
         idx.last_to_run = sdsl::int_vector<>(r,0,log_r);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(r);
-            /* ulint* sa_val;
+            
+            ulint* buf = new ulint[1];
             for (ulint i = 0; i < r; ++i) {
-                fread(sa_val,SABYTES,1,file_esa);
-                size_t s = fread(sa_val,SABYTES,1,file_esa);
-                if (s!=1) die(".esa read failed");
-                idx.samples_last[i] = *sa_val > 0 ? *sa_val-1 : size-1;
-                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
-            }
-            idx.last_SA_val = *sa_val;*/
-            ulint* buf = new ulint[2];
-            for (ulint i = 0; i < r; ++i) {
-                size_t s = fread(buf, SABYTES, 2, file_esa);
-                if (s!=2) die(".esa read failed.");
-                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                if (fread(buf, SABYTES, 1, file_esa) != 1) die(".esa read failed.");
+                if (fread(buf, SABYTES, 1, file_esa) != 1) die(".esa read failed.");
+                ulint sa_val = buf[0] % (1UL << (8*SABYTES));
+                sa_val = (sa_val > 0) ? (sa_val - 1) : (size-1);
                 idx.samples_last[i] = sa_val;
                 pos_run_pairs[i] = {sa_val,i};
             }
-            idx.last_SA_val = buf[1];
+            idx.last_SA_val = buf[0] % (1UL << (8*SABYTES));
             delete[] buf;
 
 
@@ -183,63 +176,107 @@ public:
 
         std::cout << "done.\nBuilding run-length compressed PLCP ... " << std::flush;
 
+        std::cout << std::endl << "FL: " << std::endl;
+        for (int i = 0; i < 100; ++i) std::cout << idx.FL(i) << " ";
+        std::cout << std::endl;
+
+        std::cout << std::endl << "LF: " << std::endl;
+        for (int i = 0; i < 100; ++i) std::cout << idx.LF(i) << " ";
+        std::cout << std::endl;
+
+        std::cout << "PFP RLBWT: " << std::endl;
+        for (int i = 0; i < 100; ++i) std::cout << idx.remap_inv[idx.bwt[i]] << " ";
+        std::cout << std::endl;
+
+        std::cout << "In-memory samples_last ... " << std::endl;
+        for (int i = 0; i < 100; ++i) std::cout << idx.samples_last[i] << " " << std::flush;
+        std::cout << std::endl;
+
+        std::cout << "PFP Phi... " << std::endl;
+        for (int i = 0; i < 200; ++i) std::cout << idx.Phi(i) << " " << std::flush;
+        std::cout << std::endl;
+        
+        std::cout << "PFP PhiI ... " << std::endl;
+        for (int i = 0; i < 200; ++i) std::cout << idx.PhiI(i) << " " << std::flush;
+        std::cout << std::endl;
+
         // construct run-length encoded PLCP
         {
             std::vector<ulint> ones, zeros;
 
-            ulint i = idx.FL(0); // ISA[0]
-            assert(i>0);
-            uchar c = idx.F_at(i); // T[0]
-            ulint i0 = i-1;
-            uchar c0 = idx.F_at(i-1); // T[\phi(0)]
-            ulint l = 0, prev_l = 0;
-            ulint acc0 = 0, acc1 = 0;
-            ones.push_back(0);
-            for (ulint j = 0; j < size-1; ++j) {
-                while (c == c0) {
-                    // compute FL(i) & FL(i0), compare BWT chars
-                    l++;
-                    ulint p = i - idx.F[c];
-                    i = idx.bwt.select(p,c);
-                    c = idx.F_at(i);
-                    ulint p0 = i0 - idx.F[c0];
-                    i0 = idx.bwt.select(p0,c0);
-                    c0 = idx.F_at(i0);
-                }
-                if (l==0) {
-                    ulint p = i - idx.F[c];
-                    i = idx.bwt.select(p,c); // i = FL(i)
-                    c = idx.F_at(i);
-                    assert(i>0 || j == size-2);
-                    i0 = i - 1;
-                    c0 = idx.F_at(i0);
-                }
+            uchar c, c0;
+            ulint p, p0, pos, l, gap;
+            ulint prev_pos = 0;
+            ulint prev_l = 0;
+            //ulint acc0 = 0, acc1 = 1;
+            //ones.push_back(0);
+            ulint acc0=0, acc1=0;
 
-                if (j == 0) {
-                    if (l) {
-                        acc0 += l - 1;
-                        zeros.push_back(acc0);
-                        acc1++;
-                    } else {
-                        acc1++;
+            std::cout << "i-th run end PLCP: " << std::endl;
+
+            for (ulint i = 0; i < r; ++i) {
+                // runの境界ごとに辞書順を求めて、
+                // そっからF_atの値を求めて、一致する間FLして、
+                // そこのPLCP値をもとめて+gap - prev_plcpだけacc0をプラスする
+                pos = idx.first.select(i);
+
+                // l = i == 0 ? pos : (pos - prev_pos - 1); // ?
+                gap = i == 0 ? pos : (pos - prev_pos - 1);
+
+                l = 0;
+                ulint q = idx.bwt.run_start(idx.first_to_run[i]);
+                c = idx.bwt[q];
+                p = idx.F[c] + idx.bwt.rank(q,c);
+                if (p != 0) {
+                    p0 = p - 1;
+                    c0 = idx.F_at(p0);
+                    while (c == c0) {
+                        // compute FL(p) & FL(p0), compare BWT chars
+                        l++;
+                        ulint i = p - idx.F[c];
+                        p = idx.bwt.select(i,c);
+                        c = idx.F_at(p);
+                        ulint i0 = p0 - idx.F[c0];
+                        p0 = idx.bwt.select(i0,c0);
+                        c0 = idx.F_at(p0);
                     }
                 }
-                else if (l + 1 - prev_l) {
-                    ones.push_back(acc1);
-                    acc0 += l + 1 - prev_l;
-                    zeros.push_back(acc0);
-                    acc1++;
-                } else {
-                    acc1++;
+
+                // if (i < 100) std::cout << l << " " << std::flush;
+                if (i < 100) for (ulint g = 0; g <= gap; ++g) {
+                    std::cout << l + gap - g << " " << std::flush;
                 }
 
+                if (i == 0) {
+                    if (l + gap > 0) {
+                        ones.push_back(acc1);
+                        acc0 += l + gap - 1;
+                        zeros.push_back(acc0);
+                        acc1 += gap + 1;
+                    } else {
+                        acc1 += gap + 1;
+                    }
+                } else if (l + gap + 1 - prev_l) {
+                    ones.push_back(acc1);
+                    acc0 += l + gap + 1 - prev_l;
+                    zeros.push_back(acc0);
+                    acc1 += gap + 1;
+                } else {
+                    acc1 += gap + 1;
+                }
+
+                prev_pos = pos;
                 prev_l = l;
-                if (l) l--;      
             }
             ones.push_back(acc1);
 
             idx.plcp = permuted_lcp<>(size,ones,zeros);
+            std::cout << "PLCP OK!" << std::endl;
         }
+
+        std::cout << "PFP PLCP: " << std::endl;
+        for (ulint i = 0; i < 100; ++i) std::cout << idx.plcp[i] << " ";
+        std::cout << std::endl;
 
         std::cout << "done.\nBuilding kmer[0,bl) ... " << std::flush;
 
@@ -342,19 +379,12 @@ public:
         idx.first_to_runR = sdsl::int_vector<>(rR,0,log_rR);
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
-            /*ulint* sa_val;
+            ulint* buf = new ulint[1];
             for (ulint i = 0; i < rR; ++i) {
-                fread(sa_val,SABYTES,1,file_ssa_rev);
-                size_t s = fread(sa_val,SABYTES,1,file_ssa_rev);
-                if (s!=1) die(".rev.ssa read failed");
-                idx.samples_firstR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
-                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
-            }*/
-            ulint* buf = new ulint[2];
-            for (ulint i = 0; i < rR; ++i) {
-                size_t s = fread(buf, SABYTES, 2, file_ssa_rev);
-                if (s!=2) die(".rev.ssa read failed.");
-                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                if (fread(buf, SABYTES, 1, file_ssa_rev) != 1) die(".rev.ssa read failed.");
+                if (fread(buf, SABYTES, 1, file_ssa_rev) != 1) die(".rev.ssa read failed.");
+                ulint sa_val = buf[0] % (1UL << (8*SABYTES));
+                sa_val = (sa_val > 0) ? (sa_val - 1) : (size-1);
                 idx.samples_firstR[i] = sa_val;
                 pos_run_pairs[i] = {sa_val,i};
             }
@@ -379,24 +409,16 @@ public:
         ulint last_SA_valR; // temporary
         {
             auto pos_run_pairs = std::vector<std::pair<ulint,ulint>>(rR);
-            /*ulint* sa_val;
+            ulint* buf = new ulint[1];
             for (ulint i = 0; i < rR; ++i) {
-                fread(sa_val,SABYTES,1,file_esa_rev);
-                size_t s = fread(sa_val,SABYTES,1,file_esa_rev);
-                if (s!=1) die(".rev.esa read failed");
-                idx.samples_lastR[i] = *sa_val > 0 ? *sa_val-1 : size-1;
-                pos_run_pairs[i] = {*sa_val > 0 ? *sa_val-1 : size-1,i};
-            }
-            last_SA_valR = *sa_val;*/
-            ulint* buf = new ulint[2];
-            for (ulint i = 0; i < rR; ++i) {
-                size_t s = fread(buf, SABYTES, 2, file_esa_rev);
-                if (s!=2) die(".rev.ssa read failed.");
-                ulint sa_val = buf[1] > 0 ? buf[1] - 1 : size-1;
+                if (fread(buf, SABYTES, 1, file_esa_rev) != 1) die(".rev.esa read failed.");
+                if (fread(buf, SABYTES, 1, file_esa_rev) != 1) die(".rev.esa read failed.");
+                ulint sa_val = buf[0] % (1UL << (8*SABYTES));
+                sa_val = (sa_val > 0) ? (sa_val - 1) : (size-1);
                 idx.samples_lastR[i] = sa_val;
                 pos_run_pairs[i] = {sa_val,i};
             }
-            last_SA_valR = buf[1];
+            last_SA_valR = buf[0] % (1UL << (8*SABYTES));
             delete[] buf;
 
             std::sort(pos_run_pairs.begin(),pos_run_pairs.end());
@@ -416,54 +438,57 @@ public:
         {
             std::vector<ulint> ones, zeros;
 
-            ulint i = idx.FLR(0); // ISA^R[0]
-            assert(i>0);
-            uchar c = idx.F_at(i); // T[0]
-            ulint i0 = i-1;
-            uchar c0 = idx.F_at(i-1); // T[\phi(0)]
-            ulint l = 0, prev_l = 0;
-            ulint acc0 = 0, acc1 = 0;
-            ones.push_back(0);
-            for (ulint j = 0; j < size-1; ++j) {
-                while (c == c0) {
-                    // compute FLR(i) & FLR(i0), compare BWT^R chars
-                    l++;
-                    ulint p = i - idx.F[c];
-                    i = idx.bwtR.select(p,c);
-                    c = idx.F_at(i);
-                    ulint p0 = i0 - idx.F[c0];
-                    i0 = idx.bwtR.select(p0,c0);
-                    c0 = idx.F_at(i0);
-                }
-                if (l==0) {
-                    ulint p = i - idx.F[c];
-                    i = idx.bwtR.select(p,c); // i = FL(i)
-                    c = idx.F_at(i);
-                    assert(i>0 || j == size-2);
-                    i0 = i - 1;
-                    c0 = idx.F_at(i0);
-                }
+            uchar c, c0;
+            ulint p, p0, pos, l, gap;
+            ulint prev_pos = 0;
+            ulint prev_l = 0;
+            ulint acc0=0, acc1=0;
 
-                if (j == 0) {
-                    if (l) {
-                        acc0 += l - 1;
-                        zeros.push_back(acc0);
-                        acc1++;
-                    } else {
-                        acc1++;
+
+            for (ulint i = 0; i < rR; ++i) {
+                pos = idx.firstR.select(i);
+
+                gap = i == 0 ? pos : (pos - prev_pos - 1);
+
+                l = 0;
+                ulint q = idx.bwtR.run_start(idx.first_to_runR[i]);
+                c = idx.bwtR[q];
+                p = idx.F[c] + idx.bwtR.rank(q,c);
+                if (p != 0) {
+                    p0 = p - 1;
+                    c0 = idx.F_at(p0);
+                    while (c == c0) {
+                        // compute FL(p) & FL(p0), compare BWT chars
+                        l++;
+                        ulint i = p - idx.F[c];
+                        p = idx.bwtR.select(i,c);
+                        c = idx.F_at(p);
+                        ulint i0 = p0 - idx.F[c0];
+                        p0 = idx.bwtR.select(i0,c0);
+                        c0 = idx.F_at(p0);
                     }
                 }
-                else if (l + 1 - prev_l) {
+
+                if (i == 0) {
+                    if (l + gap > 0) {
+                        ones.push_back(acc1);
+                        acc0 += l + gap - 1;
+                        zeros.push_back(acc0);
+                        acc1 += gap + 1;
+                    } else {
+                        acc1 += gap + 1;
+                    }
+                } else if (l + gap + 1 - prev_l) {
                     ones.push_back(acc1);
-                    acc0 += l + 1 - prev_l;
+                    acc0 += l + gap + 1 - prev_l;
                     zeros.push_back(acc0);
-                    acc1++;
+                    acc1 += gap + 1;
                 } else {
-                    acc1++;
+                    acc1 += gap + 1;
                 }
 
+                prev_pos = pos;
                 prev_l = l;
-                if (l) l--;      
             }
             ones.push_back(acc1);
 
@@ -539,8 +564,8 @@ public:
     }
 
     ulint save_to_file(std::string const& output) {
-        std::cout << "Saving br-index to " << output + EXTIDX << " ... " << std::flush;
-        std::ofstream f(output + EXTIDX);
+        std::cout << "Saving br-index to " << output + "." + EXTIDX << " ... " << std::flush;
+        std::ofstream f(output + "." + EXTIDX);
         ulint bytes = idx.serialize(f);
         std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl;
         return bytes;

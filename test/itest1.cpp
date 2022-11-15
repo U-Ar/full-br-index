@@ -14,7 +14,8 @@ const ulint LENGTH = 50;
 
 struct KR_window {
     int wsize;
-    int *window;
+    //int *window;
+    vector<int> window;
     int asize;
     // const ulint prime = 1999999973;
     const ulint prime = 27162335252586509;
@@ -28,7 +29,8 @@ struct KR_window {
         for(int i=1;i<wsize;i++) 
         asize_pot = (asize_pot*asize)% prime; // ugly linear-time power algorithm  
         // alloc and clear window
-        window = new int[wsize];
+        // window = new int[wsize];
+        window = vector<int>(w);
         reset();     
     }
 
@@ -38,8 +40,9 @@ struct KR_window {
         asize_pot = 1;
         for(int i=1;i<wsize;i++) 
         asize_pot = (asize_pot*asize)% prime;
-        delete[] window;
-        window = new int[wsize];
+        // delete[] window;
+        // window = new int[wsize];
+        window.resize(w);
         reset();
     }
     
@@ -67,10 +70,6 @@ struct KR_window {
         w.append(1,window[i%wsize]);
         return w;
     }
-    
-    ~KR_window() {
-        delete[] window;
-    } 
 
 };
 
@@ -79,9 +78,9 @@ ulint kr_hash(string const& s) {
     //const ulint prime = 3355443229;     // next prime(2**31+2**30+2**27)
     const ulint prime = 27162335252586509; // next prime (2**54 + 2**53 + 2**47 + 2**13)
     for(size_t k = 0; k < s.size(); k++) {
-      int c = (unsigned char) s[k];
-      assert(c>=0 && c< 256);
-      hash = (256*hash + c) % prime;    //  add char k
+        int c = (unsigned char) s[k];
+        assert(c>=0 && c< 256);
+        hash = (256*hash + c) % prime;    //  add char k
     } 
     return hash; 
 }
@@ -90,7 +89,7 @@ ulint kr_hash(string const& s) {
 // keys are Karp-Rabin hash
 map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
 {
-    vector<KR_window> windows(max_len,KR_window(1));
+    vector<KR_window> windows(max_len, KR_window(1));
     for (ulint l = 1; l <= max_len; ++l) windows[l-1].resize(l);
 
     map<ulint,ulint> hash_table;
@@ -99,10 +98,10 @@ map<ulint,ulint> kr_freqs(string const& text, ulint max_len)
     {
         for (ulint l = 1; l <= max_len; ++l) 
         {
-            ulint hash = windows[l-1].addchar(text[i]); 
+            ulint hash = windows[l-1].addchar((uchar)text[i]); 
             if (i >= l-1) {
                 // increment hash table's freq
-                if (hash_table.find(hash)==hash_table.end()) {
+                if (hash_table.count(hash) == 0) {
                     hash_table[hash] = 1;
                 } else {
                     hash_table[hash]++;
@@ -124,12 +123,20 @@ bool verify(string const& text, br_index& idx, br_sample const& sample, string c
     bool ok = true;
 
     // check frequency of substring
-    if (freqs.find(hash)==freqs.end() || freqs.at(hash)!=cnt)
+    if (freqs.count(hash)==0 || freqs[hash]!=cnt)
     {
         cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
-        cerr << "  Numbers of substring " << pattern << " differ." << endl;
-        cerr << "  KR hash  : " << (freqs.find(hash)==freqs.end() ? 0 : freqs.at(hash)) << endl;
-        cerr << "  br-index : " << cnt;
+        cerr << "  Numbers of substring \"" << pattern << "\" differ." << endl;
+        cerr << "  KR hash  : " << (freqs.count(hash)==0 ? 0 : freqs[hash]) << endl;
+        cerr << "  br-index : " << cnt << endl;
+
+        cerr << "  direct hash : " << hash << endl;
+        cerr << "  direct freq : " << (freqs.count(hash)==0 ? 0 : freqs[hash]) << endl;
+        KR_window window(pattern.size());
+        ulint w_hash;
+        for (size_t i = 0; i < pattern.size(); ++i) w_hash = window.addchar(pattern[i]);
+        cerr << "  window hash : " << w_hash << endl;
+        cerr << "  window freq : " << (freqs.count(w_hash)==0 ? 0 : freqs[w_hash]) << endl;
         return false;
     }
 
@@ -149,7 +156,7 @@ bool verify(string const& text, br_index& idx, br_sample const& sample, string c
         if (pos+pattern.size()>text.size()) {
             cerr << "Error at " << frag_num << "-th fragment, " << step << "-th " << opname << "." << endl;
             cerr << "  Pattern starting from located pos overflows text size." << endl;
-            cerr << "  pos: " << pos << " pattern: " << pattern << " textsize: " << text.size() << endl;
+            cerr << "  pos: " << pos << " pattern: \"" << pattern << "\" textsize: " << text.size() << endl;
             ok = false; continue;
         }
 
@@ -195,10 +202,9 @@ int main(int argc, char** argv)
     if (!fin.is_open()) {
         cerr << "Text file " << input_file << " is not found. Exitting ... " << endl; exit(1);
     }
-    string text;
-    while (!fin.eof()) text.push_back(fin.get());
-    fin.close();
 
+    string text((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
+    fin.close();
 
     // compute KR hash
     cout << "Count frequencies of substrings of length <= " << LENGTH << endl;
@@ -274,9 +280,9 @@ int main(int argc, char** argv)
     auto t2 = clock::now();
 
     cout << "==== Test1 on " << input_file << " finished" << endl;
-    cout << "     Elapsed time: " 
+    cout << "==== (Elapsed time: " 
          << fixed << setprecision(4) 
          << (double)chrono::duration_cast<chrono::milliseconds>(t2-t1).count()/1000
-         << endl;
+         << ")" << endl << endl;
 
 }
