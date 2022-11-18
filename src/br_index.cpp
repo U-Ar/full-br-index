@@ -1071,14 +1071,15 @@ std::vector<ulint> br_index::locate(std::string const& pattern)
     return locate_sample(sample);
 }
 
-// gets MEMs
-void br_index::maximal_exact_match(std::string const& pattern)
+// gets MEMs (returns max length of maximal substrings)
+ulint br_index::maximal_exact_match(std::string const& pattern)
 {
     ulint m = pattern.size();
     ulint j = 0, l = 0, max_l = 0;
     bool extended = false;
 
-    br_sample sample(get_initial_sample());
+    br_sample init(get_initial_sample());
+    br_sample sample(init);
 
     for (ulint i = 0; i < m; ++i)
     {
@@ -1093,12 +1094,12 @@ void br_index::maximal_exact_match(std::string const& pattern)
         }
         if (extended)
         {
-            std::cout << "Starting from: " << i << " length: "<< l << std::endl;
+            if (l > max_l) max_l = l;
         }
         
         if (i == j)
         {
-            sample = get_initial_sample();
+            sample = init;
             j++;
             l = 0;
         }
@@ -1109,7 +1110,36 @@ void br_index::maximal_exact_match(std::string const& pattern)
         }
         extended = false;
     }
+    return max_l;
+}
 
+ulint br_index::_full_task_dfs(ulint k, ulint t, br_sample const& prev)
+{
+    if (prev.len >= k) return 0;
+    
+    ulint total = 0, acc = 0;
+
+    for (ulint a = 2; a <= sigma; ++a) {
+        br_sample sample(prev);
+
+        sample.rangeR = LFR(prev.rangeR,(uchar)a);
+        sample.len++;
+
+        ulint cnt = sample.rangeR.second + 1 - sample.rangeR.first;
+        if (cnt >= t) 
+        {
+            total += cnt;
+            total += _full_task_dfs(k,t,sample);
+        }
+    }
+
+    return total;
+}
+
+// compute total number of substrings with length<=k & frequency>=t
+ulint br_index::full_task(ulint k, ulint t) {
+    br_sample sample(get_initial_sample());
+    return _full_task_dfs(k,t,sample);
 }
 
 // suffix tree op: parent

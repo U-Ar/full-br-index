@@ -63,8 +63,8 @@ public:
 
     ulint count(std::string const& pattern); // count(P)
     std::vector<ulint> locate(std::string const& pattern); // locate(P)
-    void maximal_exact_match(std::string const& pattern); // MEMs
-
+    ulint maximal_exact_match(std::string const& pattern); // MEMs
+    ulint full_task(ulint k, ulint t); // #substrings with length<=k & frequency>=t
 
     // suffix tree operations
     inline br_sample root() { return get_initial_sample(); }
@@ -108,6 +108,8 @@ public:
 private:
     std::tuple<std::string, std::vector<range_t>, std::vector<range_t> > 
     sufsort(sdsl::int_vector<8>& text, sdsl::int_vector_buffer<>& sa);
+
+    ulint _full_task_dfs(ulint k, ulint t, br_sample const& sample);
 
     static const uchar TERMINATOR = 1;
     

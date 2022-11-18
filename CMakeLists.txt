@@ -53,7 +53,7 @@ ADD_LIBRARY(brindex STATIC ${BRI_SOURCES})
 
 # ------ add executables using br_index here ------
 SET(PROJECT_EXECUTABLES
-	bri-mem
+	bri-query
 	bri-space)
 
 FOREACH( exe ${PROJECT_EXECUTABLES} )

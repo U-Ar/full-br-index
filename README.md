@@ -15,7 +15,7 @@ The full br-index in this repository is the enhanced version of the br-index wit
 In addition to extensions and locate, it supports _left-contraction_ and _right-contraction_, which are the inverse operations of _left-extension_ and _right-extension_. There are time-space trade-offs based on the value of the parameter *bl*. The recommended value is around 15, and it is set to 8 by default. The supports of the five key operations enable complex searches. As an example we implement the _Maximal Exact Matches_ query in _src/bri-mem.cpp_.
 
 The index is constructed by the _Prefix-Free Parsing_ method. Suitable for highly repetitive huge text collections.
-The rather simple in-memory construction is also supported (-i option for _bri-build_), but it takes time and consumes memory.
+The rather simple in-memory construction is also supported (-i option for _bri-build_), but it consumes memory.
 
 ## System Requirements
 
@@ -48,8 +48,8 @@ By default 5 entry-point executables will be created in the _build_ directory.
 <dl>
 	<dt>bri-build (Python script)</dt>
 	<dd>Builds the br-index on the input text file using Prefix-Free Parsing.</dd>
-        <dt>bri-mem</dt>
-	<dd>Computes Maximal Exact Matches of the given pattern.</dd>
+    <dt>bri-query</dt>
+	<dd>Computes searching queries on the index. (count, locate, MEMs, full-task)</dd>
 	<dt>bri-space</dt>
 	<dd>Shows the statistics of the text and the breakdown of the index space usage.</dd>
 	<dt>unit-test</dt>
