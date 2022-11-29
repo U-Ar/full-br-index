@@ -47,7 +47,7 @@ For the detail of the tests, refer to _test/README.md_.
 By default 5 entry-point executables will be created in the _build_ directory.
 <dl>
 	<dt>bri-build (Python script)</dt>
-	<dd>Builds the br-index on the input text file using Prefix-Free Parsing.</dd>
+	<dd>Builds the br-index on the input text file using Prefix-Free Parsing. Using -t option is not recommended now: it causes errors during the computation of multi-threaded PFP.</dd>
     <dt>bri-query</dt>
 	<dd>Computes searching queries on the index. (count, locate, MEMs, full-task)</dd>
 	<dt>bri-space</dt>
