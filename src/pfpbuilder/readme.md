@@ -1,6 +1,6 @@
 # Big-BWT for br-index
 
-Modified Big-BWT(https://gitlab.com/manzai/Big-BWT) for the construction of the br-index.
+Big-BWT(https://gitlab.com/manzai/Big-BWT) modified for the construction of the br-index.
 
 Big-BWT is the tool to build the BWT and optionally the Suffix Array for highly repetitive files using the approach described in *Prefix-Free Parsing for Building Big BWTs* by Christina Boucher, Travis Gagie, Alan Kuhnle and Giovanni Manzini [1]. If you need the detail of PFP refer to the link above.
 
