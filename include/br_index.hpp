@@ -86,8 +86,8 @@ public:
 
     // I/O
     ulint serialize(std::ostream& out);
-    void load(std::istream& in);
-    void load(std::istream& in, ulint bl);
+    void load(std::istream& in, bool backward_compatibility=false);
+    void load(std::istream& in, ulint bl, bool backward_compatibility=false);
     void save_to_file(std::string const& path_prefix);
     void load_from_file(std::string const& path);
     ulint print_space(ulint fix);

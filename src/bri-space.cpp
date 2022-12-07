@@ -11,6 +11,7 @@ using namespace bri;
 struct Args {
     int bl = -1;
     string idx_file = "";
+    bool old = false;
 };
 
 void print_help(char** argv, Args &args) {
@@ -18,7 +19,8 @@ void print_help(char** argv, Args &args) {
     std::cout << "Show breakdown of br-index space usage." << std::endl << std::endl;
     std::cout << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl 
-        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl;
+        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl
+        << "\t-b  \t(backward compatibility for indexes built by old versions)" << std::endl;
     exit(1);
 }
 
@@ -33,13 +35,15 @@ void parse_args( int argc, char** argv, Args& arg ) {
     puts("");
 
     std::string sarg;
-    while ((c = getopt( argc, argv, "l:h") ) != -1) {
+    while ((c = getopt( argc, argv, "l:hb") ) != -1) {
         switch(c) {
             case 'l':
             sarg.assign( optarg );
             arg.bl = stoi( sarg ); break;
             case 'h':
             print_help(argv, arg); exit(1);
+            case 'b':
+            arg.old = true; break;
             case '?':
             cout << "Unknown option. Use -h for help." << endl;
             exit(1);
@@ -56,16 +60,16 @@ void parse_args( int argc, char** argv, Args& arg ) {
 
 int main(int argc, char** argv) {
 
-	Args arg;
-    parse_args(argc, argv, arg);
+	Args args;
+    parse_args(argc, argv, args);
 
 	br_index idx;
 
-	cout << "Loading br-index from " << arg.idx_file << " ..." << flush;
+	cout << "Loading br-index from " << args.idx_file << " ..." << flush;
 
-	ifstream in(arg.idx_file);
-	if (arg.bl == -1) idx.load(in);
-	else idx.load(in,arg.bl);
+	ifstream in(args.idx_file);
+	if (args.bl == -1) idx.load(in,args.old);
+	else idx.load(in,args.bl,args.old);
 
 	cout << "done."<< endl;
 	

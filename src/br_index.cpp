@@ -1348,7 +1348,6 @@ ulint br_index::serialize(std::ostream& out)
                 + 256*sizeof(ulint);
     
     w_bytes += bwt.serialize(out);
-    w_bytes += bwtR.serialize(out);
 
     w_bytes += samples_first.serialize(out);
     w_bytes += samples_last.serialize(out);
@@ -1358,6 +1357,11 @@ ulint br_index::serialize(std::ostream& out)
 
     w_bytes += last.serialize(out);
     w_bytes += last_to_run.serialize(out);
+    
+    w_bytes += plcp.serialize(out);
+    
+
+    w_bytes += bwtR.serialize(out);
 
     w_bytes += samples_firstR.serialize(out);
     w_bytes += samples_lastR.serialize(out);
@@ -1368,7 +1372,6 @@ ulint br_index::serialize(std::ostream& out)
     w_bytes += lastR.serialize(out);
     w_bytes += last_to_runR.serialize(out);
 
-    w_bytes += plcp.serialize(out);
     w_bytes += plcpR.serialize(out);
 
     for (ulint k = 0; k < length; ++k)
@@ -1383,7 +1386,8 @@ ulint br_index::serialize(std::ostream& out)
 
 }
 
-void br_index::load(std::istream& in)
+// backward_compatibility: option for indexes built by old versions
+void br_index::load(std::istream& in, bool backward_compatibility)
 {
 
     in.read((char*)&sigma,sizeof(sigma));
@@ -1399,31 +1403,65 @@ void br_index::load(std::istream& in)
     F = std::vector<ulint>(256);
     in.read((char*)F.data(),256*sizeof(ulint));
 
-    bwt.load(in);
-    bwtR.load(in);
-    r = bwt.number_of_runs();
-    rR = bwtR.number_of_runs();
+    if (!backward_compatibility)
+    {
+        bwt.load(in);
+        r = bwt.number_of_runs();
 
-    samples_first.load(in);
-    samples_last.load(in);
+        samples_first.load(in);
+        samples_last.load(in);
 
-    first.load(in);
-    first_to_run.load(in);
+        first.load(in);
+        first_to_run.load(in);
 
-    last.load(in);
-    last_to_run.load(in);
+        last.load(in);
+        last_to_run.load(in);
+        
+        plcp.load(in);
 
-    samples_firstR.load(in);
-    samples_lastR.load(in);
 
-    firstR.load(in);
-    first_to_runR.load(in);
+        bwtR.load(in);
+        rR = bwtR.number_of_runs();
 
-    lastR.load(in);
-    last_to_runR.load(in);
-    
-    plcp.load(in);
-    plcpR.load(in);
+        samples_firstR.load(in);
+        samples_lastR.load(in);
+
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+
+        plcpR.load(in);
+    }
+    else // backward_compatibility
+    {
+        bwt.load(in);
+        bwtR.load(in);
+        r = bwt.number_of_runs();
+        rR = bwtR.number_of_runs();
+
+        samples_first.load(in);
+        samples_last.load(in);
+
+        first.load(in);
+        first_to_run.load(in);
+
+        last.load(in);
+        last_to_run.load(in);
+
+        samples_firstR.load(in);
+        samples_lastR.load(in);
+
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+        
+        plcp.load(in);
+        plcpR.load(in);
+    }
 
     kmer.resize(length);
     kmerR.resize(length);
@@ -1435,7 +1473,7 @@ void br_index::load(std::istream& in)
     }
 
 }
-void br_index::load(std::istream& in, ulint bl)
+void br_index::load(std::istream& in, ulint bl, bool backward_compatibility)
 {
 
     in.read((char*)&sigma,sizeof(sigma));
@@ -1458,31 +1496,65 @@ void br_index::load(std::istream& in, ulint bl)
     F = std::vector<ulint>(256);
     in.read((char*)F.data(),256*sizeof(ulint));
 
-    bwt.load(in);
-    bwtR.load(in);
-    r = bwt.number_of_runs();
-    rR = bwtR.number_of_runs();
+    if (!backward_compatibility)
+    {
+        bwt.load(in);
+        r = bwt.number_of_runs();
 
-    samples_first.load(in);
-    samples_last.load(in);
+        samples_first.load(in);
+        samples_last.load(in);
 
-    first.load(in);
-    first_to_run.load(in);
+        first.load(in);
+        first_to_run.load(in);
 
-    last.load(in);
-    last_to_run.load(in);
+        last.load(in);
+        last_to_run.load(in);
+        
+        plcp.load(in);
 
-    samples_firstR.load(in);
-    samples_lastR.load(in);
 
-    firstR.load(in);
-    first_to_runR.load(in);
+        bwtR.load(in);
+        rR = bwtR.number_of_runs();
 
-    lastR.load(in);
-    last_to_runR.load(in);
-    
-    plcp.load(in);
-    plcpR.load(in);
+        samples_firstR.load(in);
+        samples_lastR.load(in);
+
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+
+        plcpR.load(in);
+    }
+    else // backward_compatibility
+    {
+        bwt.load(in);
+        bwtR.load(in);
+        r = bwt.number_of_runs();
+        rR = bwtR.number_of_runs();
+
+        samples_first.load(in);
+        samples_last.load(in);
+
+        first.load(in);
+        first_to_run.load(in);
+
+        last.load(in);
+        last_to_run.load(in);
+
+        samples_firstR.load(in);
+        samples_lastR.load(in);
+
+        firstR.load(in);
+        first_to_runR.load(in);
+
+        lastR.load(in);
+        last_to_runR.load(in);
+        
+        plcp.load(in);
+        plcpR.load(in);
+    }
 
     kmer.resize(length);
     kmerR.resize(length);

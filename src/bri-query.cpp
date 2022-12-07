@@ -24,6 +24,7 @@ struct Args {
     string pattern_file = "";
     int k = -1;
     int t = -1;
+    bool old = false;
 };
 
 void print_help(char** argv, Args &args) {
@@ -39,7 +40,8 @@ void print_help(char** argv, Args &args) {
 
     std::cout << std::endl << "  Options: " << std::endl
         << "\t-h  \tshow help and exit" << std::endl
-        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl;
+        << "\t-l L\tparameter bl for contraction shortcut, def. index file's bl" << args.bl << std::endl
+        << "\t-b  \t(backward compatibility for indexes built by old versions)" << std::endl;
     // << "\t-c C\tcheck correctness of each pattern occurrence" << std::endl
     exit(1);
 }
@@ -55,7 +57,7 @@ void parse_args( int argc, char** argv, Args& arg ) {
     puts("");
 
     std::string sarg;
-    while ((c = getopt( argc, argv, "c:l:h") ) != -1) {
+    while ((c = getopt( argc, argv, "c:l:hb") ) != -1) {
         switch(c) {
             case 'c':
             arg.check.assign(optarg); break;
@@ -64,6 +66,8 @@ void parse_args( int argc, char** argv, Args& arg ) {
             arg.bl = stoi( sarg ); break;
             case 'h':
             print_help(argv, arg); exit(1);
+            case 'b':
+            arg.old = true; break;
             case '?':
             cout << "Unknown option. Use -h for help." << endl;
             exit(1);
@@ -210,8 +214,8 @@ int main(int argc, char** argv)
         cerr << "Cannot open index file: " << args.idx_file << endl;
         exit(1);
     }
-    if (args.bl == -1) idx.load(fidx);
-    else idx.load(fidx,args.bl);
+    if (args.bl == -1) idx.load(fidx,args.old);
+    else idx.load(fidx,args.bl,args.old);
     fidx.close();
 
     cout << "done." << endl;

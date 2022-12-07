@@ -38,7 +38,12 @@ class br_index_builder {
 public:
     // input: file basename of Prefix-Free Parsing (.bwt, .ssa, .esa, .rev.bwt, .rev.ssa, .rev.esa are necessary)
     // bl: parameter
-    br_index_builder& build_from_pfp(std::string const& input, int bl) {
+    // output: output index basename
+    ulint build_from_pfp(std::string const& input, int bl, std::string const& output) {
+
+        std::cout << "PFP built br-index will be saved to " << output + "." + EXTIDX << "." << std::endl;
+
+        ulint bytes = 0;
 
         std::cout << "Building br-index on " << input << std::endl;
         std::cout << "  using PFP parsing files." << std::endl;
@@ -298,6 +303,56 @@ public:
         }
         
         std::cout << "done." << std::endl;
+
+
+        // save RLBWT, SA samples, PLCP and remove them from memory
+        // they are not necessary for the construction process afterward
+        {
+            std::ofstream out(output + "." + EXTIDX);
+            out.write((char*)&idx.sigma,sizeof(idx.sigma));
+            out.write((char*)&idx.length,sizeof(idx.length));
+
+            out.write((char*)idx.remap.data(),256*sizeof(uchar));
+            out.write((char*)idx.remap_inv.data(),256*sizeof(uchar));
+
+            out.write((char*)&idx.last_SA_val,sizeof(idx.last_SA_val));
+            out.write((char*)idx.F.data(),256*sizeof(ulint));
+
+            bytes += sizeof(idx.sigma)
+                + sizeof(idx.length)
+                + 256*sizeof(uchar)
+                + 256*sizeof(uchar)
+                + sizeof(idx.last_SA_val)
+                + 256*sizeof(ulint);
+            
+            bytes += idx.bwt.serialize(out);
+            
+            bytes += idx.samples_first.serialize(out);
+            bytes += idx.samples_last.serialize(out);
+
+            bytes += idx.first.serialize(out);
+            bytes += idx.first_to_run.serialize(out);
+
+            bytes += idx.last.serialize(out);
+            bytes += idx.last_to_run.serialize(out);
+    
+            bytes += idx.plcp.serialize(out);
+
+            idx.bwt = {};
+            idx.samples_first = sdsl::int_vector<>();
+            idx.samples_last = sdsl::int_vector<>();
+            idx.first = br_index::sparse_bitvector_t();
+            idx.first_to_run = sdsl::int_vector<>();
+            idx.last = br_index::sparse_bitvector_t();
+            idx.last_to_run = sdsl::int_vector<>();
+            idx.plcp = {};
+        }
+
+
+
+
+
+
         std::cout << "Start building components for the reversed direction." << std::endl;
 
         // load from reversed files
@@ -511,17 +566,36 @@ public:
             }
         }
 
+        // save remaining structures
+        {
+            std::ofstream out(output + "." + EXTIDX, std::ofstream::app);
+
+            bytes += idx.bwtR.serialize(out);
+
+            bytes += idx.samples_firstR.serialize(out);
+            bytes += idx.samples_lastR.serialize(out);
+
+            bytes += idx.firstR.serialize(out);
+            bytes += idx.first_to_runR.serialize(out);
+
+            bytes += idx.lastR.serialize(out);
+            bytes += idx.last_to_runR.serialize(out);
+
+            bytes += idx.plcpR.serialize(out);
+
+            for (ulint k = 0; k < bl; ++k)
+            {
+                bytes += idx.kmer[k].serialize(out);
+
+                bytes += idx.kmerR[k].serialize(out);
+            }
+        }
+
         std::cout << "done." << std::endl;
         std::cout << "Completed br-index construction." << std::endl;
-        
-        return *this;
-    }
 
-    ulint save_to_file(std::string const& output) {
-        std::cout << "Saving PFP built br-index to " << output + "." + EXTIDX << " ... " << std::flush;
-        std::ofstream f(output + "." + EXTIDX);
-        ulint bytes = idx.serialize(f);
-        std::cout << "done.\nTotal index size: " << bytes << " bytes." << std::endl << std::endl;
+        std::cout << "Total index size: " << bytes << std::endl << std::endl;
+        
         return bytes;
     }
 };
@@ -613,5 +687,5 @@ int main(int argc, char** argv) {
     }
 
     br_index_builder builder;
-    ulint idx_size = builder.build_from_pfp(arg.input_file,arg.bl).save_to_file(arg.output_base);
+    ulint idx_size = builder.build_from_pfp(arg.input_file,arg.bl,arg.output_base);
 }

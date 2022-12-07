@@ -218,7 +218,7 @@ int main(int argc, char** argv)
     }
     cout << "Loading " << idx_file << " with bl = " << bl << " ... " << flush;
     br_index idx;
-    idx.load(fidx,bl);
+    idx.load(fidx,(ulint)bl);
     fidx.close();
     cout << "done." << endl;
 
