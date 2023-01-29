@@ -12,7 +12,7 @@ Its uses O(r) words of space, whose r is the number of equal-letter runs in BWT 
 The br-index is the bi-directional text index based on the r-index, supporting _left-extension_, _right-extension_, and _locate_ at any step of the search. It consists of the r-index on the text, the r-index on the reversed text, and the permuted LCP array (PLCP).
 
 The full br-index in this repository is the enhanced version of the br-index with additional data structures.
-In addition to extensions and locate, it supports _left-contraction_ and _right-contraction_, which are the inverse operations of _left-extension_ and _right-extension_. There are time-space trade-offs based on the value of the parameter *bl*. The recommended value is around 15, and it is set to 8 by default. The supports of the five key operations enable complex searches. As an example we implement the _Maximal Exact Matches_ query in _src/bri-mem.cpp_.
+In addition to extensions and locate, it supports _left-contraction_ and _right-contraction_, which are the inverse operations of _left-extension_ and _right-extension_. There are time-space trade-offs based on the value of the parameter *bl*. The recommended value is around 15, and it is set to 8 by default. The supports of the five key operations enable complex searches. As an example we implement the _Maximal Exact Matches_ query in _src/bri-query.cpp_.
 
 The index is constructed by the _Prefix-Free Parsing_ method. Suitable for highly repetitive huge text collections.
 The rather simple in-memory construction is also supported (-i option for _bri-build_), but it consumes memory.
